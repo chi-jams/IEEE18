@@ -8,13 +8,22 @@ const int BLINK_PIN = 13;
 void setup() {
   // put your setup code here, to run once:
   Wire.begin(0x28);
+  
   Wire.onReceive(parseReceive);
+  Wire.onRequest(parseRequest);
   pinMode(MOTOR_PIN, OUTPUT);
   pinMode(4, OUTPUT);
 
+  
   Serial.begin(9600);
   while(!Serial) {}
   Serial.println("Hello world");
+
+  while(Wire.available()) {
+    char c = Wire.read();
+    Serial.println(c);
+  }
+  
 }
 
 void loop() {
@@ -31,5 +40,14 @@ void parseReceive(int numBytes) {
     Serial.println(c);
     analogWrite(MOTOR_PIN, c);
   }
+}
+
+void parseRequest() {
+  while(Wire.available()) {
+    int c = Wire.read();
+    Serial.println(c);
+    analogWrite(MOTOR_PIN, c);
+  }
+  Wire.write(42);
 }
 
