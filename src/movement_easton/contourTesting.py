@@ -14,13 +14,14 @@ while True:
     area = 0
     cnt = 0
     centroid = (0,0)
-    print(len(contours))
     if 0 < len(contours) < 3:
         area, cnt = max([(cv2.contourArea(c), c) for c in contours])
         M = cv2.moments(cnt)
         centroid = (int(M['m10']/M['m00']), int(M['m01']/M['m00']))
         if area > 100000:
-            circles = cv2.HoughCircles(imgray, cv2.HOUGH_GRADIENT, 1, 100, 300, param1=50, param2=30, minRadius=50, maxRadius=150)
+            circles = cv2.HoughCircles(imgray, cv2.HOUGH_GRADIENT, 1, 100, 
+                                       param1=50, param2=30, minRadius=20,
+                                       maxRadius=150)
             if circles is not None:
                 circles = np.uint16(np.around(circles))
                 for i in circles[0, :]:
