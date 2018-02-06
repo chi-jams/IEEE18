@@ -1,11 +1,19 @@
+#include <Wire.h>
+
+const int i2c_address = 0x30;
 
 enum {BR, BL, FR, FL};
 const int PIN_E[4] = {3,5,6,9};
 const int PIN_M[4] = {2,4,7,8};
 
-const int SPEED = 100;
+const int SPEED = 200;
 
 void setup(){
+
+  Wire.begin(i2c_address);
+
+  Wire.onReceive(parseReceive);
+  Wire.onRequest(handleRequest);
 
   for (int i = 0; i < 4; i++){
     pinMode(PIN_E[i], OUTPUT);
@@ -16,9 +24,9 @@ void setup(){
 
 void loop(){
 
-  Serial.println("Started");
 
-  Forward();
+  Left();
+  //test code
   /*delay(2000);
   Backward();
   delay(2000);
@@ -86,4 +94,30 @@ void Stop(){
   }  
   
 }
+
+void parseReceive(int numBytes){
+
+    while(Wire.available()){
+      
+        int action = Wire.read();
+
+        //TODO do things with the received action
+      
+    }
+  
+  
+}
+
+void handleRequest(){
+  
+    //TODO send something back given the request  
+  
+}
+
+
+
+
+
+
+
 
