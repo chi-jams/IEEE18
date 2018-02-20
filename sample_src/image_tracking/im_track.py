@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import math
 
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 REFERENCE_IMG = "pi_box.jpg"
 MIN_MATCH_CT = 10 
 FLANN_INDEX_KDTREE = 0
@@ -16,8 +16,15 @@ index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
 search_params = dict(checks = 50)
 flann = cv2.FlannBasedMatcher(index_params, search_params)
 
+read = True
 while True:
-    _, frame = cap.read()
+    
+    if read:
+        read = False
+        _, frame = cap.read()
+    else:
+        read = True
+        continue
     grey = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     target_kp, target_des = sift.detectAndCompute(grey, None)
     matches = flann.knnMatch(np.asarray(ref_des, np.float32), np.asarray(target_des, np.float32),k=2)
