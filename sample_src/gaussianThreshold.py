@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-cap = cv2.VideoCapture(1);
+cap = cv2.VideoCapture(0);
 print("{}x{}".format(cap.get(3), cap.get(4)))
 while True:
 	#capture a convert to grayscale
