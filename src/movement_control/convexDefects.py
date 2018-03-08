@@ -15,24 +15,31 @@ while True:
     #take in image and clean it
     _, img = cap.read()
     img_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    # MOVE THIS DOWN DUMBASS img_gray = cv2.erode(img_gray, kernel, iterations=1)
-    #img_gray = cv2.dilate(img_gray, kernel, iterations=1)
     blur = cv2.GaussianBlur (img_gray, (5,5), 0)
-    #threshold the image to binary with Otsu's binarization
+    #threshold the image to binary
     #ret, thresh = cv2.threshold(blur, 60, 255,cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     ret, thresh = cv2.threshold(blur, 135, 255,cv2.THRESH_BINARY_INV)
+    thresh = cv2.erode(thresh, kernel, iterations=1)
+    thresh = cv2.dilate(thresh, kernel, iterations=1)
     #get the contours of the image
     _, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
+    #if contours exist
     if contours:
+        #get the maximum contour
         cnt = contours[np.argmax(np.array([cv2.contourArea(cnt) for cnt in contours]), axis=0)]
+        #get convex hull of max contour
         hull = cv2.convexHull(cnt,returnPoints = False)
+        #get convexity defects between contour and convex hull
         defects = cv2.convexityDefects(cnt,hull)
 
+        #if there are defects
         if defects is not None:
+            #get the 4 largest defects
             defects = defects[defects[:,0][:,3].argsort()[-4:]]
             pts = []
             for i in range(defects.shape[0]):
+                #get start, end, defect pt, dist
                 s,e,f,d = defects[i,0]
                 start = tuple(cnt[s][0])
                 end = tuple(cnt[e][0])
@@ -43,6 +50,7 @@ while True:
                 cv2.circle(img,far,5,[0,0,255],-1)
 
             end_pts = []
+            #get halfway points between pairs of convex hull points
             while pts:
                 first = pts.pop()
                 second = min(pts, key=lambda p: (p[0] - first[0]) ** 2 + 
@@ -53,6 +61,8 @@ while True:
                 cv2.circle(img,end_pts[-1],5,[255,0,0],-1)
             print(end_pts)
             
+            #get winding order of points and draw intersection to get center
+            #and angle
             end_pts.sort(key=lambda p: atan2(p[1] - CENTER[1], p[0] - CENTER[0]))
             print(end_pts)
             if len(end_pts) > 2:
