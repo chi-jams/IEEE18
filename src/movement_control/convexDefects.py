@@ -3,6 +3,7 @@
 import cv2
 import numpy as np
 from math import atan2
+from geometryHelpers import *
 
 cap = cv2.VideoCapture(1)
 
@@ -17,8 +18,8 @@ while True:
     img_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur (img_gray, (5,5), 0)
     #threshold the image to binary
-    #ret, thresh = cv2.threshold(blur, 60, 255,cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    ret, thresh = cv2.threshold(blur, 135, 255,cv2.THRESH_BINARY_INV)
+    ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    #ret, thresh = cv2.threshold(blur, 135, 255,cv2.THRESH_BINARY_INV)
     thresh = cv2.erode(thresh, kernel, iterations=1)
     thresh = cv2.dilate(thresh, kernel, iterations=1)
     #get the contours of the image
@@ -26,6 +27,11 @@ while True:
     
     #if contours exist
     if contours:
+        ###################
+        #   CONTOURS AND  #
+        #     DEFECTS     #
+        ###################
+
         #get the maximum contour
         cnt = contours[np.argmax(np.array([cv2.contourArea(cnt) for cnt in contours]), axis=0)]
         #get convex hull of max contour
@@ -48,40 +54,56 @@ while True:
                 pts.append(start)
                 pts.append(end)
                 far = tuple(cnt[f][0])
-                #get the length of the hull line
-                lineLen = (start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2
-                #
-                t = max (0, min(1, np.dot(np.array(far) - np.array(start),\
-                           np.array(end) - np.array(start))  \
-                           / lineLen) )
-                proj = np.array(start) + t * (np.array(end) - np.array(start))
+                #get the projection point
+                proj = projection(start, end, far)
+                #convert to pixel-friendly values
                 proj = proj.astype(np.int32)
+                #save shortline distance
+                dists.append(length_squared(proj, far)) 
+                #draw
                 cv2.line(img,far,tuple(proj),[255,0,0],2)
                 cv2.line(img,start,end,[0,255,0],2)
                 cv2.circle(img,far,5,[0,0,255],-1)
-            print(dists) 
             end_pts = []
-            #get halfway points between pairs of convex hull points
-            while pts:
-                first = pts.pop()
-                second = min(pts, key=lambda p: (p[0] - first[0]) ** 2 + 
-                                                 (p[1] - first[1]) ** 2)
-                pts.remove(second)    
-                end_pts.append((int((first[0] + second[0])/2), 
-                                int((first[1] + second[1])/2)))
-                cv2.circle(img,end_pts[-1],5,[255,0,0],-1)
             
-            #get winding order of points and draw intersection to get center
-            #and angle
-            end_pts.sort(key=lambda p: atan2(p[1] - CENTER[1], p[0] - CENTER[0]))
-            if len(end_pts) > 2:
-                cv2.line(img, end_pts[0],end_pts[2],[0,255,0],2)
-            if len(end_pts) > 3:
-                cv2.line(img, end_pts[1],end_pts[3],[0,255,0],2)
+            if len(dists) > 2:
+                if all(dists[i] > 250 for i in range(len(dists))):
+                    ##############
+                    # DRAW CROSS #
+                    ##############
+
+                    #get halfway points between pairs of convex hull points
+                    while pts:
+                        first = pts.pop()
+                        second = min(pts, key=lambda p: length_squared(p, first) )
+                        pts.remove(second)    
+                        end_pts.append(midpoint(first, second,toInt = True)) 
+                        cv2.circle(img,end_pts[-1],5,[255,0,0],-1)
+                    
+                    #get winding order of points and draw intersection to get center
+                    #and angle
+                    end_pts.sort(key=lambda p: atan2(p[1] - CENTER[1], p[0] - CENTER[0]))
+                    if len(end_pts) > 2:
+                        cv2.line(img, end_pts[0],end_pts[2],[0,255,0],2)
+                    if len(end_pts) > 3:
+                        cv2.line(img, end_pts[1],end_pts[3],[0,255,0],2)
+                        #get center
+                        center = seg_intersect(end_pts[0], end_pts[2], 
+                                               end_pts[1], end_pts[3], 
+                                               toInt = True)
+                        #get topmost pt
+                        ref_pt = max(end_pts, key=lambda p: p[1] - center[1])
+                        #get angle
+                        angle = int((atan2(ref_pt[1] - center[1], 
+                                       ref_pt[0] - center[0]) * 180 / 3.14159) - 90)
+                        cv2.putText(img, str(angle), (100,400),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255))
+                        cv2.line(img, (center[0], 0), tuple(center), [0,0,255], 2)
+                        cv2.circle(img, tuple(center), 5, [0,0,255], -1)
 
 
-    cv2.imshow("heyo", img);
-    cv2.imshow("heyo2", thresh)
+    cv2.imshow("cap", img);
+    cv2.imshow("threshold", thresh)
     if cv2.waitKey(1) & 0xff == ord('q'):
         cv2.destroyAllWindows()
         break;
