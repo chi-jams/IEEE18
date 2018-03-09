@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from math import atan2
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 kernel = np.ones((5,5) , np.uint8)
 
@@ -38,17 +38,28 @@ while True:
             #get the 4 largest defects
             defects = defects[defects[:,0][:,3].argsort()[-4:]]
             pts = []
+            dists = []
             for i in range(defects.shape[0]):
                 #get start, end, defect pt, dist
                 s,e,f,d = defects[i,0]
                 start = tuple(cnt[s][0])
                 end = tuple(cnt[e][0])
+                #append relevant hull points 
                 pts.append(start)
                 pts.append(end)
                 far = tuple(cnt[f][0])
+                #get the length of the hull line
+                lineLen = (start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2
+                #
+                t = max (0, min(1, np.dot(np.array(far) - np.array(start),\
+                           np.array(end) - np.array(start))  \
+                           / lineLen) )
+                proj = np.array(start) + t * (np.array(end) - np.array(start))
+                proj = proj.astype(np.int32)
+                cv2.line(img,far,tuple(proj),[255,0,0],2)
                 cv2.line(img,start,end,[0,255,0],2)
                 cv2.circle(img,far,5,[0,0,255],-1)
-
+            print(dists) 
             end_pts = []
             #get halfway points between pairs of convex hull points
             while pts:
@@ -59,12 +70,10 @@ while True:
                 end_pts.append((int((first[0] + second[0])/2), 
                                 int((first[1] + second[1])/2)))
                 cv2.circle(img,end_pts[-1],5,[255,0,0],-1)
-            print(end_pts)
             
             #get winding order of points and draw intersection to get center
             #and angle
             end_pts.sort(key=lambda p: atan2(p[1] - CENTER[1], p[0] - CENTER[0]))
-            print(end_pts)
             if len(end_pts) > 2:
                 cv2.line(img, end_pts[0],end_pts[2],[0,255,0],2)
             if len(end_pts) > 3:
