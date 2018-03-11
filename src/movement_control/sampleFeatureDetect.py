@@ -1,5 +1,11 @@
 #!/usr/bin/python3
 
+
+#Cross Detection
+#Returns the difference between the center of the camera and the center of the 
+#cross feature as well as the difference between the intended orientation and
+#the goal orientation
+
 import cv2
 import numpy as np
 from math import atan2

@@ -40,6 +40,15 @@ def length_squared(a,b, toInt = False):
     else:
         return int((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
+def length(a,b, toInt = False):
+    if not toInt:
+        return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) **0.5
+    else:
+        return int(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5)
+
+
+
+
 def midpoint(a, b, toInt = False):
     if not toInt:
         return ((a[0] + b[0])/2,(a[1] + b[1])/2)
