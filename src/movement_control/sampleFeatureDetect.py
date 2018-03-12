@@ -44,7 +44,26 @@ while True:
         hull = cv2.convexHull(cnt,returnPoints = False)
         #get convexity defects between contour and convex hull
         defects = cv2.convexityDefects(cnt,hull)
+        
+        epsilon = 0.1 * cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, epsilon, True)
 
+        mid_pts = []
+        approx = [tuple(approx[i][0]) for i in range(len(approx))]
+        #for p in approx:
+        #    #cv2.circle(img, p, 5, [0,0,255], -1)
+        while approx:
+            first = approx.pop()
+            if not approx:
+                break
+            second = min(approx, key=lambda p: length_squared(p, first) )
+            approx.remove(second) 
+            mid_pts.append(midpoint(first, second, toInt = True)) 
+            cv2.circle(img,mid_pts[-1],5,[255,0,0],-1)
+        if len(mid_pts) > 1:
+            cv2.line(img, mid_pts[0], mid_pts[1], [255,0,0], 2)
+
+        '''
         #if there are defects
         if defects is not None:
             #get the 4 largest defects
@@ -107,7 +126,7 @@ while True:
                         cv2.line(img, (center[0], 0), tuple(center), [0,0,255], 2)
                         cv2.circle(img, tuple(center), 5, [0,0,255], -1)
 
-
+        '''
     cv2.imshow("cap", img);
     cv2.imshow("threshold", thresh)
     if cv2.waitKey(1) & 0xff == ord('q'):

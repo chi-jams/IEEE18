@@ -32,7 +32,7 @@ def projection(a, b, p, toInt = False):
     if not toInt:
         return proj
     else:
-        return proj.astype(int32)
+        return proj.astype(np.int32)
 
 def length_squared(a,b, toInt = False):
     if not toInt:

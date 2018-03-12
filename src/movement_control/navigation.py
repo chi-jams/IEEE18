@@ -1,3 +1,5 @@
+from featureDetect import *
+
 def readInstructionFile():
     file = open("instructions.txt", "r")
     instructList = []
@@ -5,8 +7,17 @@ def readInstructionFile():
         instructList.append(line.split())
     return instructList
 
-def sendTargetPosition(x,y,r,d)
+def sendTargetPosition(x,y,r,d):
+    pass
     #TODO actually send this stuff over
+
+def sendCurrentPosition(x,y,r):
+    pass
+    #TODO actually send this stuff over
+
+def isAtGoal(g, c):
+    pass
+    #TODO check if current state is within bounds of goal state
 
 def executeInstuctions(instructList):
     for instuct in instructList:
@@ -36,12 +47,16 @@ def executeInstuctions(instructList):
                     elif check == "toLine":
                         #TODO do the toLine checker
                         refAngle = instruct[5]
-                    else
+                    else:
+                        pass
                         #TODO do the toL checker
                     
                     #TODO adjust feature detection values to adjust for
                     #     orientation
-                    
-                    sendCurrentPosition(x_c,y_c,r_c,d)#wait
+                        
+                    sendCurrentPosition(x_c,y_c,r_c)#wait
 
                     atGoal = isAtGoal((x,y,r), (x_c, y_c, r_c))
+
+fd = FeatureDetector(30,debug=True)
+fd.crossDetect()
