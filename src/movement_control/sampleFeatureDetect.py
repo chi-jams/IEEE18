@@ -24,7 +24,7 @@ while True:
     img_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur (img_gray, (5,5), 0)
     #threshold the image to binary
-    ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    ret, thresh = cv2.threshold(blur, 200, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     #ret, thresh = cv2.threshold(blur, 135, 255,cv2.THRESH_BINARY_INV)
     thresh = cv2.erode(thresh, kernel, iterations=1)
     thresh = cv2.dilate(thresh, kernel, iterations=1)
@@ -44,7 +44,27 @@ while True:
         hull = cv2.convexHull(cnt,returnPoints = False)
         #get convexity defects between contour and convex hull
         defects = cv2.convexityDefects(cnt,hull)
+        pts = [tuple(pt) for pt in cv2.boxPoints(cv2.minAreaRect(cnt))]
+        '''
+        for pt in pts:
+            cv2.circle(img,tuple(pt),5,[255,0,0],-1)
+        print(pts)
+        '''
+        mid_pts = []
+        while pts:
+            first = pts.pop()
+            if not pts:
+                break
+            second = min(pts, key=lambda p: length_squared(p, first) )
+            pts.remove(second) 
+            mid_pts.append(midpoint(first, second, toInt = True)) 
+            cv2.circle(img,mid_pts[-1],5,[0,255,0],-1)
+        if len(mid_pts) > 1:
+            cv2.line(img, mid_pts[0], mid_pts[1], [0,255,0], 2)
+
+        #cv2.drawContours(img, [np.int0(pts)], 0, (0, 0, 255), 2)
         
+        '''
         epsilon = 0.1 * cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, epsilon, True)
 
@@ -62,6 +82,7 @@ while True:
             cv2.circle(img,mid_pts[-1],5,[255,0,0],-1)
         if len(mid_pts) > 1:
             cv2.line(img, mid_pts[0], mid_pts[1], [255,0,0], 2)
+        '''
 
         '''
         #if there are defects
