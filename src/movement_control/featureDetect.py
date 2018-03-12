@@ -69,7 +69,9 @@ class FeatureDetector:
                     cv2.circle(self.orig_img,mid_pts[-1],5,[0,255,0],-1)
 
             # Distance from the line to the screen
-            err = projection(mid_pts[0], mid_pts[1], self.SCREEN_CENTER, toInt=True)
+            proj = projection(mid_pts[0], mid_pts[1], self.SCREEN_CENTER, toInt=True)
+            err = length(proj, self.SCREEN_CENTER)
+            err = [0, err] if getHorizontal else [err, 0]
 
             if getHorizontal:
                 angle_ref = max(mid_pts, key=lambda p: p[0])
@@ -82,12 +84,15 @@ class FeatureDetector:
 
             if self.debug and len(mid_pts) > 1:
                 cv2.line(self.orig_img, mid_pts[0], mid_pts[1], [0,255,0], 2)
-                cv2.line(self.orig_img, tuple(err), tuple(self.SCREEN_CENTER), [0,255,0], 2)
+                cv2.line(self.orig_img, tuple(proj), tuple(self.SCREEN_CENTER), [0,255,0], 2)
                 cv2.imshow("lineCheck", self.orig_img)
                 if cv2.waitKey(1) & 0xff == ord('q'):
                     cv2.destroyAllWindows()
+            if getHorizontal:
+                err[1] *= 1 if self.SCREEN_CENTER[1] - proj[1] < 0 else -1
+            else:
+                err[0] *= -1 if self.SCREEN_CENTER[0] - proj[0] < 0 else 1
 
-            err = [a - b for a, b in zip(err, self.SCREEN_CENTER)]
             frame_err = (*err, r_err)
             print(frame_err)
             errs = [errs[i] + frame_err[i] for i in range(3)]
