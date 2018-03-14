@@ -24,9 +24,9 @@ def projection(a, b, p, toInt = False):
     #get the length of the hull line
     lineLen = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
     #distance down the projection line
-    t = max (0, min(1, np.dot(np.array(p) - np.array(a),\
+    t = max(0, min(1, np.dot(np.array(p) - np.array(a),\
 	       np.array(b) - np.array(a))  \
-	       / lineLen) )
+	       / lineLen )) 
     #get the projection line point
     proj = np.array(a) + t * (np.array(b) - np.array(a))
     if not toInt:

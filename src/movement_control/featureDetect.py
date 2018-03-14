@@ -44,6 +44,8 @@ class FeatureDetector:
     def lineDetect(self, orientation):
         errs = (0, 0, 0)
         
+        succ_reads = 0
+
         if orientation == "horizontal":
             getHorizontal = True
         elif orientation == "vertical":
@@ -96,12 +98,15 @@ class FeatureDetector:
             frame_err = (*err, r_err)
             print(frame_err)
             errs = [errs[i] + frame_err[i] for i in range(3)]
-        errs = [errs[i] / self.frame_checks for i in range(3)]
+            succ_reads += 1
+        errs = [errs[i] / succ_reads for i in range(3)]
         print(errs)
         return errs
 
     def crossDetect(self):
         errors = (0, 0, 0)
+
+        succ_reads = 0
 
         for frame in range(self.frame_checks):
             self.read()
@@ -176,8 +181,73 @@ class FeatureDetector:
                     frame_error = (x_error, y_error, r_error)
                     print(frame_error)
                     errors = [errors[i] + frame_error[i] for i in range(3)]
-        errors = [errors[i] / self.frame_checks for i in range(3)]
+                    succ_reads += 1
+        errors = [errors[i] / succ_reads for i in range(3)]
         print (errors)
         return errors
 
+    def LDetect(self):
+        errors = (0, 0, 0)
 
+        succ_reads = 0
+
+        for frame in range(self.frame_checks):
+            self.read()
+            if self.defects is not None:
+                #get the largest defect
+                top_defect = self.defects[self.defects[:,0][:,3].argmax()]
+                print (top_defect)
+                #get start, end, defect pt, dist
+                s,e,f,d = top_defect[0]
+
+                pts = []
+                pts.append(tuple(self.max_contour[s][0]))
+                pts.append(tuple(self.max_contour[e][0]))
+                far = tuple(self.max_contour[f][0])
+                
+
+                #sort to get highest point first
+                if pts[0][1] < pts[1][1]:
+                    pts = pts[::-1]
+
+                #get the x projection point
+                x_end = (far[0] - 1000 * (pts[0][0] - far[0]),
+                        (far[1] - 1000 * (pts[0][1] - far[1])))
+                x_proj = projection(pts[0], x_end, self.SCREEN_CENTER, toInt=True)
+                x_error = length(x_proj, self.SCREEN_CENTER)
+                if self.SCREEN_CENTER[0] < x_proj[0]:
+                    x_error *= -1
+               
+                #get the y projection point
+                y_end = (far[0] - 1000 * (pts[1][0] - far[0]),
+                        (far[1] - 1000 * (pts[1][1] - far[1])))
+                y_proj = projection(pts[1], y_end, self.SCREEN_CENTER, toInt=True)
+                y_error = length(x_proj, self.SCREEN_CENTER)
+                if self.SCREEN_CENTER[1] < y_proj[1]:
+                    y_error *= -1
+                
+                #r difference
+                r_error = (atan2(pts[1][1] - far[1], 
+                                 pts[1][0] - far[0])
+                                 * self.RAD_TO_DEG)
+                    
+                #draw
+                if self.debug:
+                    cv2.line(self.orig_img, far,pts[0], [255,0,0], 2)
+                    cv2.line(self.orig_img, far,pts[1], [0,255,0], 2)
+                    cv2.circle(self.orig_img,far,5,[0,0,255],-1)
+                    cv2.imshow("LCheck", self.orig_img)
+
+                    if cv2.waitKey(1) & 0xff == ord('q'):
+                        cv2.destroyAllWindows()
+
+                frame_error = (x_error, y_error, r_error)
+                print(frame_error)
+                errors = [errors[i] + frame_error[i] for i in range(3)]
+                succ_reads += 1
+
+        errors = [errors[i] / succ_reads for i in range(3)]
+        print (errors)
+        return errors
+
+    

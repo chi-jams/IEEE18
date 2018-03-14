@@ -61,5 +61,6 @@ def executeInstuctions(instructList):
 
 fd = FeatureDetector(30,debug=True)
 while True:
-    #fd.crossDetect()
-    fd.lineDetect("horizontal")
+    fd.crossDetect()
+    #fd.lineDetect("horizontal")
+    #fd.LDetect()
