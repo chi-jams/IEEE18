@@ -59,8 +59,9 @@ def executeInstuctions(instructList):
 
                     atGoal = isAtGoal((x,y,r), (x_c, y_c, r_c))
 
-fd = FeatureDetector(30,debug=True)
-while True:
-    fd.crossDetect()
-    #fd.lineDetect("horizontal")
-    #fd.LDetect()
+if __name__ == "__main__":
+    fd = FeatureDetector(30,debug=True)
+    while True:
+        fd.crossDetect()
+        #fd.lineDetect("horizontal")
+        #fd.LDetect()
