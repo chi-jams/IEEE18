@@ -182,6 +182,9 @@ class FeatureDetector:
                     print(frame_error)
                     errors = [errors[i] + frame_error[i] for i in range(3)]
                     succ_reads += 1
+        if succ_reads == 0: #REMOVE THIS
+            return (-1,-1,-1)
+        
         errors = [errors[i] / succ_reads for i in range(3)]
         print (errors)
         return errors
