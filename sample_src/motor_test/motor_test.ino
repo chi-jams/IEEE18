@@ -3,10 +3,10 @@
 const int i2c_address = 0x30;
 
 enum {BR, BL, FR, FL};
-const int PIN_E[4] = {3,5,6,9};
-const int PIN_M[4] = {2,4,7,8};
+const int PIN_E[4] = {2,3,4,5};
+const int PIN_M[4] = {25,24,23,22};
 
-const int SPEED = 200;
+const int SPEED = 50;
 
 void setup(){
 
@@ -25,31 +25,20 @@ void setup(){
 void loop(){
 
 
-  Left();
-  //test code
-  /*delay(2000);
+  Forward();
+  delay(2000);
   Backward();
-  delay(2000);
-  Left();
-  delay(2000);
-  Right();
-  delay(2000);
-  Stop();
-  delay(2000); */
+  delay(1000);
+
     
 }
 
 void Forward(){
   
     for (int i = 0; i < 4; i++){
-      if (i%2 == 0){
+
         analogWrite(PIN_E[i], SPEED);
         digitalWrite(PIN_M[i], HIGH);
-      }
-      else {
-        analogWrite(PIN_E[i], SPEED);
-        digitalWrite(PIN_M[i], LOW);
-      }
       
   }  
 }
@@ -57,14 +46,8 @@ void Forward(){
 void Backward(){
   
   for (int i = 0; i < 4; i++){
-      if (i%2 == 0){
         analogWrite(PIN_E[i], SPEED);
         digitalWrite(PIN_M[i], LOW);
-      }
-      else {
-        analogWrite(PIN_E[i], SPEED);
-        digitalWrite(PIN_M[i], HIGH);
-      }
   }  
   
 }
