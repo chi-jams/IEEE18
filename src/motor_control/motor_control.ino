@@ -4,22 +4,24 @@
 //encoder constants
 const unsigned long COUNTS_PER_REV = 3200;
 const float DISTANCE_PER_REV = 3.14159265 * 3.295; //pi * wheel diameter
-const float DISTANCE_PER_DEG = 3.14159265 * 5.5;
+const float DISTANCE_PER_DEG = 3.14159265 * 30.0 / 360; 
+const float ROBOT_LENGTH = 10.75;
+const int MOVING_AVG_SIZE = 25;
 
-const float K_P = 1/320.0;
-#define ZERO_ERROR_MARGIN 30
-#define MIN_MOTOR_SPEED 80
-#define MAX_MOTOR_SPEED 100
+const float K_P = 1/80.0;
+#define ZERO_ERROR_MARGIN 240
+int  MIN_MOTOR_SPEED = 110;
+int  MAX_MOTOR_SPEED = 150;
 
 //encoder pins values
 unsigned int ENC_PINS[4][2] = { {A8, A9 },
-                                {A10,A11},
                                 {10, 11},
+                                {A10,A11},
                                 {12, 13} };
 
 //motor pins
 unsigned int PWM_PINS[4] = {2, 3, 4, 5};
-unsigned int DIR_PINS[4] = {25, 24, 23, 22};
+unsigned int DIR_PINS[4] = {23, 22, 25, 24};
 
 //encoder distinction enums
 enum ENC {FL, FR, BL, BR};
@@ -53,14 +55,9 @@ void setup() {
 }
 
 void loop() {
-  
-/* for (int i = 0; i < 4; i++){
-    Serial.print(enc_counts[i]);
-    Serial.print(" ");  
-  }
-  Serial.println(); */
 
-  drive(60);
+  //drive(60);
+  turn(-90);
   while(true){}
   
 }
@@ -71,26 +68,37 @@ void loop() {
  */
 void drive(float distance){
 
+    MIN_MOTOR_SPEED = 70;
+    MAX_MOTOR_SPEED = 100;
+
     resetEncoderCounts();
     
-    //convert to goal encoder values
     long goals[4];
     for (int i = 0; i < 4; i++){
         goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV); 
     }
   
-    long errors[4];
+    long errors[4][MOVING_AVG_SIZE];
+    int replaceIndex = 0;
+    bool filled = false;
     do { 
+      
         for (int i = 0; i < 4; i++){
-            errors[i] = enc_counts[i] - goals[i];
+            errors[i][replaceIndex] = enc_counts[i] - goals[i];
+            if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+            if (!filled) continue;
             
-            int motorVal = -errorToMotorOut(K_P, errors[i]);
-            Serial.print(errors[i]);
+            int motorVal = -errorToMotorOut(K_P, errors[i][replaceIndex]);
+            Serial.print(average(errors[i]));
             Serial.print("  ");
+            
             setMotor(i, motorVal);
         }
         Serial.println();
+        replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
     } while (!isZero(errors));
+    Serial.println("DONE");
+    stopMotors();
 }
 
 /*
@@ -98,29 +106,65 @@ void drive(float distance){
  * Takes in an angle in degrees and turns CW/CCW until value is reached
  */
 void turn(float angle){
+    
+    drive(-ROBOT_LENGTH * abs(angle)/180.0);
+
+    MIN_MOTOR_SPEED = 160;
+    MAX_MOTOR_SPEED = 200;
   
     resetEncoderCounts();
 
-    long distance = 
+    float distance = DISTANCE_PER_DEG * abs(angle); 
     
     //convert to goal encoder values
     long goals[4];
     for (int i = 0; i < 4; i++){
-        goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV); 
+      
+        if (angle > 0)
+            goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV) 
+                              * ((i == FR || i == BR) ? 1: 0); 
+        else 
+            goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV) 
+                              * ((i == FR || i == BR) ? 0: 1);
+       
     }
   
-    long errors[4];
+    long errors[4][MOVING_AVG_SIZE];
+    int replaceIndex;
+    bool filled = false;
     do { 
         for (int i = 0; i < 4; i++){
-            errors[i] = enc_counts[i] - goals[i];
+          
+            errors[i][replaceIndex] = enc_counts[i] - goals[i];
+            if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+            if (!filled) continue;
             
-            int motorVal = -errorToMotorOut(K_P, errors[i]);
-            Serial.print(errors[i]);
+            int motorVal = -errorToMotorOut(K_P, errors[i][replaceIndex]);
+            Serial.print(average(errors[i]));
             Serial.print("  ");
-            setMotor(i, motorVal);
+            if (angle < 0){
+                if (i != FR && i != BR) setMotor(i, motorVal);
+                setMotor(FR, 50);
+                setMotor(BR, 50);  
+                errors[FR][replaceIndex] = 0;
+                errors[BR][replaceIndex] = 0;
+            }
+            else {
+              if (i != FL && i != BL) setMotor(i, motorVal);
+                setMotor(FL, 50);
+                setMotor(BL, 50);  
+                errors[FL][replaceIndex] = 0;
+                errors[BL][replaceIndex] = 0;
+            }
+            
+            
         }
         Serial.println();
+        replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
     } while (!isZero(errors));
+
+    drive(-ROBOT_LENGTH * abs(angle)/145.0);
+    stopMotors();
   
 }
 /*
@@ -130,7 +174,7 @@ void turn(float angle){
  */
 int errorToMotorOut(float gain, long error){
     //no error
-    if (error == 0) return 0;
+    if (abs(error) <= ZERO_ERROR_MARGIN) return 0;
 
     //motor level with base power + error * gain
     int motorOut = gain * -error + (error <= 0 ? MIN_MOTOR_SPEED : -MIN_MOTOR_SPEED);
@@ -156,18 +200,34 @@ void setMotor(int m, int pwm){
     analogWrite(PWM_PINS[m], pwm);
 }
 
+void stopMotors(){
+  for(int i = 0; i < 4; i++){
+      setMotor(i, 0);  
+  } 
+}
+
 /*
  * bool isZero()
  * Takes in the list of errors values and determines if all of them are within the 
  * margin set to be "zero". This helps prevent the encoders from causing the robot
  * to oscillate back and forth due to it not being able to hit exactly zero. 
  */
-bool isZero(long* errors){
+bool isZero(long errors[][MOVING_AVG_SIZE]){
 
     bool zero = true;
-    for (int i = 0; i < 4; i++)
-        if (errors[i] > ZERO_ERROR_MARGIN) zero = false;
+    for (int i = 0; i < 4; i++){
+        if (abs(average(errors[i])) > ZERO_ERROR_MARGIN) zero = false;
+    }
     return zero;
+}
+
+long average(long* errors){
+    float sum = 0;
+    for (int i = 0; i < MOVING_AVG_SIZE; i++){
+        sum += errors[i];
+    }
+    return (long)(sum /MOVING_AVG_SIZE);
+  
 }
 
 
