@@ -1,5 +1,6 @@
 
 import numpy as np
+import math
 
 def perp( a ) :
     b = np.empty_like(a)
@@ -47,11 +48,18 @@ def length(a,b, toInt = False):
         return int(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5)
 
 
-
-
 def midpoint(a, b, toInt = False):
     if not toInt:
         return ((a[0] + b[0])/2,(a[1] + b[1])/2)
     else:
         return (int((a[0] + b[0])/2),int((a[1] + b[1])/2) )
+
+
+def angle_between(a, b, c, toInt = False):
+    vec1 = (a[0] - b[0], a[1] - b[1])
+    vec2 = (c[0] - b[0], c[1] - b[1])
+    if not toInt:
+        return math.acos(np.dot(vec1, vec2) / (length(a,b)*length(c,b)))
+    else:
+        return int(math.acos(np.dot(vec1, vec2) / (length(a,b)*length(c,b))))
 
