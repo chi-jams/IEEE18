@@ -23,7 +23,7 @@ class FeatureDetector:
         ret, thresh = cv2.threshold(blur, 60, 255,
                                     cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         thresh = cv2.erode(thresh, self.kernel, iterations=1)
-        thresh = cv2.dilate(thresh, self.kernel, iterations=1)
+        self.thresh = cv2.dilate(thresh, self.kernel, iterations=1)
         _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, 
                                           cv2.CHAIN_APPROX_SIMPLE)
         #contours exist, successful read
@@ -189,6 +189,112 @@ class FeatureDetector:
         print (errors)
         return errors
 
+    def forkDetect(self, orientation):
+        
+        #target angle in reference to line left of the diagonal
+        if orientation == 'Up':
+            targetAngle = 135
+        elif orientation == 'Down':
+            targetAngle = -45
+        elif orientation == 'Down-Right':
+            targetAngle = 0
+        elif orientation == 'Up-Right':
+            targetAngle = 90
+        else:
+            raise ValueError("Not a valid orientation of fork")
+
+        errors = (0, 0, 0)
+        circ_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (120,120))
+        succ_reads = 0
+
+        for frame in range(self.frame_checks):
+            self.read()
+            #erode all data away except the center of the image
+            center_find = cv2.erode(self.thresh, circ_kernel, iterations=1)
+            _, center_cnts, _ = cv2.findContours(center_find, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            #get the maximum image contour
+            max_center_cnt = center_cnts[np.argmax(np.array([cv2.contourArea(cnt) for cnt in center_cnts]), axis=0)]
+            #get moments
+            M = cv2.moments(max_center_cnt)
+            #get center
+            cx, cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+            center = (cx, cy)
+            if self.debug:
+                cv2.circle(self.orig_img, center, 5, [0,0,255], -1)
+          
+
+            if self.defects is not None:
+                #get the 4 largest defects
+                top_defects = self.defects[self.defects[:,0][:,3].argsort()[-4:]]
+                pts = []
+                for i in range(top_defects.shape[0]):
+                    #get start, end, defect pt, dist
+                    s,e,f,d = top_defects[i,0]
+                    start = tuple(self.max_contour[s][0])
+                    end = tuple(self.max_contour[e][0])
+                    #append relevant hull points 
+                    far = tuple(self.max_contour[f][0])
+                    btwn = angle_between(start, far, end)
+                    pts.append((far, btwn))
+                    if self.debug:
+                        cv2.line(self.orig_img, start, end, [0,255,0],2)
+                
+                #sort by angle between hull line and defect
+                pts.sort(key=lambda x: x[1])
+                #get two smallest values
+                pts = pts[:2]
+                if self.debug:
+                    for p in pts:
+                        cv2.circle(self.orig_img, p[0], 5, [255,0,0], -1)
+                
+                #get midpoint of two defects
+                defect_mid = midpoint(tuple(pts[0][0]), tuple(pts[1][0]), 
+                                      toInt=True)
+                diag1 = ((defect_mid[0]-cx)*1000  + cx, (defect_mid[1]-cy)*1000  + cy)
+                diag2 = ((defect_mid[0]-cx)*-1000 + cx, (defect_mid[1]-cy)*-1000 + cy)
+                
+                diag  = (diag1, diag2)
+                left  = rotate_around(center, diag1, -45, toInt = True)
+                left2 = rotate_around(center, diag1, 135, toInt = True)
+                right = rotate_around(center, diag1, 45, toInt = True)
+                right2= rotate_around(center, diag1, -135, toInt = True)
+
+                x_proj = projection(left, left2, self.SCREEN_CENTER, toInt=True)
+                x_error = length(x_proj, self.SCREEN_CENTER)
+                if self.SCREEN_CENTER[0] > x_proj[0]:
+                    x_error *= -1
+
+                y_proj = projection(right, right2, self.SCREEN_CENTER, toInt=True)
+                y_error = length(y_proj, self.SCREEN_CENTER)
+                if self.SCREEN_CENTER[1] < y_proj[1]:
+                    y_error *= -1
+
+                #r difference
+                r_error = (atan2(left[1] - center[1],
+                                 left[0] - center[0]) 
+                                 * self.RAD_TO_DEG)
+                r_error += targetAngle 
+
+                if self.debug:
+                    cv2.line(self.orig_img, defect_mid, center, [255,0,0], 2)
+                    cv2.line(self.orig_img, left, center, [255,0,0], 2)
+                    cv2.line(self.orig_img, right, center,[255,0,0], 2)
+                    cv2.line(self.orig_img, tuple(x_proj), 
+                             tuple(self.SCREEN_CENTER), [0,255,0], 2)
+                    cv2.line(self.orig_img, tuple(y_proj), 
+                             tuple(self.SCREEN_CENTER), [0,255,0], 2)
+                    cv2.imshow("Fork Detect", self.orig_img)
+                    if cv2.waitKey(1) & 0xff == ord('q'):
+                        cv2.destroyAllWindows()
+                
+                frame_error = (x_error, y_error, r_error)
+                errors = [errors[i] + frame_error[i] for i in range(3)]
+                succ_reads += 1
+
+        errors = [errors[i] / succ_reads for i in range(3)]
+        print (errors)
+        return errors
+
     def LDetect(self):
         errors = (0, 0, 0)
 
@@ -208,7 +314,6 @@ class FeatureDetector:
                 pts.append(tuple(self.max_contour[e][0]))
                 far = tuple(self.max_contour[f][0])
                 
-
                 #sort to get highest point first
                 if pts[0][1] < pts[1][1]:
                     pts = pts[::-1]
