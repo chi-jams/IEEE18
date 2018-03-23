@@ -63,3 +63,13 @@ def angle_between(a, b, c, toInt = False):
     else:
         return int(math.acos(np.dot(vec1, vec2) / (length(a,b)*length(c,b))))
 
+def rotate_around(origin, point, deg, toInt=False):
+    ox, oy = origin
+    px, py = point
+    rads = deg * math.pi/180.0
+    rx = ox + math.cos(rads) * (px - ox) - math.sin(rads) * (py - oy)
+    ry = oy + math.sin(rads) * (px - ox) + math.cos(rads) * (py - oy)
+    if not toInt:
+        return (rx, ry) 
+    else:
+        return (int(rx), int(ry))
