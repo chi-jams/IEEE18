@@ -261,12 +261,16 @@ class FeatureDetector:
 
                 x_proj = projection(left, left2, self.SCREEN_CENTER, toInt=True)
                 x_error = length(x_proj, self.SCREEN_CENTER)
-                if self.SCREEN_CENTER[0] > x_proj[0]:
+                x_ref_point = (center[0] + self.SCREEN_CENTER[0] - x_proj[0],
+                               center[1] + self.SCREEN_CENTER[1] - x_proj[1])
+                if angle_between(x_ref_point, center, left) > 90:
                     x_error *= -1
 
                 y_proj = projection(right, right2, self.SCREEN_CENTER, toInt=True)
                 y_error = length(y_proj, self.SCREEN_CENTER)
-                if self.SCREEN_CENTER[1] < y_proj[1]:
+                y_ref_point = (center[0] + self.SCREEN_CENTER[0] - y_proj[0],
+                               center[1] + self.SCREEN_CENTER[1] - y_proj[1])
+                if angle_between(y_ref_point, center, right) > 90:
                     y_error *= -1
 
                 #r difference
