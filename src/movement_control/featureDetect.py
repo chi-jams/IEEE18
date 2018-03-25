@@ -95,7 +95,7 @@ class FeatureDetector:
             else:
                 err[0] *= -1 if self.SCREEN_CENTER[0] - proj[0] < 0 else 1
 
-            frame_err = (*err, r_err)
+            frame_err = (err*, r_err)
             print(frame_err)
             errs = [errs[i] + frame_err[i] for i in range(3)]
             succ_reads += 1

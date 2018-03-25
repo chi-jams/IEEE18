@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from featureDetect import *
+from gyro import Gyro
 
 def readInstructionFile():
     file = open("instructions.txt", "r")
@@ -61,6 +62,8 @@ def executeInstuctions(instructList):
 
 if __name__ == "__main__":
     fd = FeatureDetector(30,debug=True)
+    g  = Gyro(0x68)
+    
     while True:
         fd.crossDetect()
         #fd.lineDetect("horizontal")
