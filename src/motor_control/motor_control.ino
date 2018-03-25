@@ -1,47 +1,65 @@
 //software interrupts library
 #include <PinChangeInt.h>
+//i2c library
+#include <Wire.h>
 
-//encoder constants
 const unsigned long COUNTS_PER_REV = 3200;
-const float DISTANCE_PER_REV = 3.14159265 * 3.295; //pi * wheel diameter
-const float DISTANCE_PER_DEG = 3.14159265 * 30.0 / 360; 
-const float ROBOT_LENGTH = 10.75;
-const int MOVING_AVG_SIZE = 25;
+const unsigned int  MOVING_AVG_SIZE = 25;
 
+const float DISTANCE_PER_REV = 3.14159265 * 3.295; //pi * wheel diameter
+const float DISTANCE_PER_DEG = 3.14159265 * 30.0 / 360; //TODO Remove with IMU
+const float ROBOT_LENGTH = 10.75;
+
+//control info
 const float K_P = 1/80.0;
-#define ZERO_ERROR_MARGIN 240
+const int ZERO_ERROR_MARGIN = 240;
 int  MIN_MOTOR_SPEED = 110;
 int  MAX_MOTOR_SPEED = 150;
 
-//encoder pins values
+//positional info
+enum POS_INFO{X, Y, R, NUM_AXIS};
+volatile int current_pos[NUM_AXIS];
+volatile int target_pos[NUM_AXIS];
+
+//encoder info
+volatile long enc_counts[4];
 unsigned int ENC_PINS[4][2] = { {A8, A9 },
                                 {10, 11},
                                 {A10,A11},
                                 {12, 13} };
 
+
 //motor pins
 unsigned int PWM_PINS[4] = {2, 3, 4, 5};
 unsigned int DIR_PINS[4] = {23, 22, 25, 24};
 
-//encoder distinction enums
+//motor distinction
 enum ENC {FL, FR, BL, BR};
 enum TYPE {A, B};
 
-//encoder counts
-volatile long enc_counts[4];
+//communication info
+enum COMMANDS {GET_TARG_POS, GET_CUR_POS};
+bool completed_movement = true;
+const int I2C_ADDR = 0x42;
+
+
+
 
 void setup() {
 
     Serial.begin(9600);
+    
+    Wire.begin(I2C_ADDR);
+    Wire.onReceive(getPosition);
+    Wire.onRequest(checkDone);
   
     for (int i = 0; i < 4; i++){
-      pinMode(ENC_PINS[i][A], INPUT_PULLUP);
-      pinMode(ENC_PINS[i][B], INPUT_PULLUP);
-
-      pinMode(DIR_PINS[i], OUTPUT);
-      pinMode(PWM_PINS[i], OUTPUT);
-    }
+        pinMode(ENC_PINS[i][A], INPUT_PULLUP);
+        pinMode(ENC_PINS[i][B], INPUT_PULLUP);
   
+        pinMode(DIR_PINS[i], OUTPUT);
+        pinMode(PWM_PINS[i], OUTPUT);
+    }
     
     PCintPort::attachInterrupt(ENC_PINS[FL][A], FLA_changed,  CHANGE);
     PCintPort::attachInterrupt(ENC_PINS[FL][B], FLB_changed,  CHANGE);
@@ -56,9 +74,6 @@ void setup() {
 
 void loop() {
 
-  //drive(60);
-  turn(-90);
-  while(true){}
   
 }
 
@@ -67,9 +82,6 @@ void loop() {
  * Takes in a distance in inches and drives forwards/backwards until value is reached
  */
 void drive(float distance){
-
-    MIN_MOTOR_SPEED = 70;
-    MAX_MOTOR_SPEED = 100;
 
     resetEncoderCounts();
     
@@ -105,12 +117,10 @@ void drive(float distance){
  * void turn()
  * Takes in an angle in degrees and turns CW/CCW until value is reached
  */
+ //TODO THIS NEEDS TO USE THE IMU WHEN IT GETS HERE, NOT ENCODERS
 void turn(float angle){
     
     drive(-ROBOT_LENGTH * abs(angle)/180.0);
-
-    MIN_MOTOR_SPEED = 160;
-    MAX_MOTOR_SPEED = 200;
   
     resetEncoderCounts();
 
@@ -230,7 +240,6 @@ long average(long* errors){
   
 }
 
-
 /*
  * void resetEncoderCounts()
  * Resets each of the encoder counts to zero 
@@ -241,6 +250,7 @@ void resetEncoderCounts(){
 
 
 /*
+ * void encoderCount()
  * Method indirectly used by the interrupts to determine the direction the wheel
  * is going based on which value changed and the state of the one that did 
  * not change
@@ -286,4 +296,43 @@ void BLA_changed(){encoderCount(BL, A);}
 void BLB_changed(){encoderCount(BL, B);}
 void BRA_changed(){encoderCount(BR, A);}
 void BRB_changed(){encoderCount(BR, B);}
+
+
+void getPosition(int num_bytes) {
+    // The smbus implementation sends over a command and the number of bytes it has in its payload
+    // before it actually, dir sends over the real data
+    int cmd = Wire.read();
+    int bytes = Wire.read();
+    
+    // Do a sanity check to make sure that the data received follows the correct format
+    if (num_bytes == bytes + 2) {
+        if (cmd == GET_TARG_POS) {
+            for(int i = 0; i < 3; i++)
+                target_pos[i] = i2cGetInt();
+            //dir = i2cGetInt(); TODO: Don't think this is needed, handled on the pi side
+        }
+        else if (cmd == GET_CUR_POS) {
+            for (int i = 0; i < 3; i++)
+                current_pos[i] = i2cGetInt();
+        }
+        else {
+            dumpData();
+        }
+    }
+    else {
+        // We have an unexpected message, throw it out.
+        dumpData();   
+    }
+}
+
+
+// Reads the next 2 bytes from the i2c bus and splices them together to make a signed 16-bit integer.
+int i2cGetInt() {
+    return ((Wire.read() << 8) | Wire.read());
+}
+
+void dumpData() {
+    while (Wire.available()) Wire.read();
+}
+
 
