@@ -7,7 +7,7 @@ class NavToDrive:
 
     SEND_TARG_POS = 0
     SEND_CUR_POS = 1
-    CHECK_DONE = 2
+    SEND_GYRO_ROT = 2
 
     def __init__(self, addr):
         self.addr = addr
@@ -29,6 +29,10 @@ class NavToDrive:
 
         msg = NavToDrive.serializeMsg(list(pos))
         self.bus.write_block_data(self.addr, NavToDrive.SEND_CUR_POS, msg)
+
+    def sendRotation(self, rot):
+	msg = NavToDrive.serializeMsg(list(rot))
+	self.bus.write_block_data(self.addr, NavToDrive.SEND_GYRO_ROT, msg)
 
     def checkDone(self):
         msg = self.bus.read_byte(self.addr) 

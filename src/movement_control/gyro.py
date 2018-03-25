@@ -14,11 +14,11 @@ class Gyro:
         self.z_rot = 0.0
 
     def read_byte(self, adr):
-        return self.bus.read_byte_data(address, adr)
+        return self.bus.read_byte_data(self.addr, adr)
 
     def read_word(self, adr):
-        high = self.bus.read_byte_data(address, adr)
-        low = self.bus.read_byte_data(address, adr+1)
+        high = self.bus.read_byte_data(self.addr, adr)
+        low = self.bus.read_byte_data(self.addr, adr+1)
         val = (high << 8) + low
         return val
 
@@ -42,20 +42,19 @@ class Gyro:
 
     def get_z_rotation(self):
         self.z_rot += self.read_word_2c(0x47) + self.offset
-        return self.z_rot
+        return math.degrees(self.z_rot / (633515.0))
 
     def calibrate(self):
         z_error = 0
         for i in range(500):
-                time.sleep(0.1)
+                time.sleep(0.01)
                 z_error += self.read_word_2c(0x47)
         self.offset = -(z_error / 500.0)
-
 
 def main():
     g = Gyro(0x68)
     while True:
-        time.sleep(0.1)
+        time.sleep(0.01)
         print(g.get_z_rotation())
 
 if __name__ == '__main__':
