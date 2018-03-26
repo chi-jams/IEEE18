@@ -16,6 +16,7 @@ def seg_intersect(a1,a2, b1,b2, toInt = False) :
     dap = perp(da)
     denom = np.dot( dap, db)
     num = np.dot( dap, dp )
+
     if not toInt:
         return (num / denom.astype(float))*db + b1
     else:
