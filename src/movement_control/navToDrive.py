@@ -31,6 +31,7 @@ class NavToDrive:
         self.bus.write_block_data(self.addr, NavToDrive.SEND_CUR_POS, msg)
 
     def sendRotation(self, rot):
+        rot = int(round(rot))
         msg = NavToDrive.serializeMsg(list(rot))
         self.bus.write_block_data(self.addr, NavToDrive.SEND_GYRO_ROT, msg)
 
@@ -63,6 +64,10 @@ if __name__ == "__main__":
                     to_drive.sendCurPos(pos)
                 else:
                     raise ValueError("Invalid number of args") 
+                
+                g = Gyro(0x68)
+                while True:
+                    sendRotation(g.get_z_rotation())
 
             except ValueError as e:
                 print(e)

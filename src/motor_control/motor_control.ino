@@ -88,7 +88,8 @@ void loop() {
     //change in position was detected
     if(posUpdated){
         posUpdated = false;
-        gotoTarget();
+        turn(target_pos[R] - current_pos[R]);
+        //gotoTarget();
     }
   
 }
@@ -205,8 +206,8 @@ void turn(float angle){
         setMotor(BL, error > 0 ? TURN_SPEED   :0);
         setMotor(FR, error > 0 ? 0:TURN_SPEED); 
         setMotor(BR, error > 0 ? 0:TURN_SPEED); 
-        gyro_rot += angle > 0 ? 1:-1; //TODO REMOVE THIS IS DEBUG
-        delay(25); //TODO REMOVE THIS IS DEBUG
+        //gyro_rot += angle > 0 ? 1:-1; //TODO REMOVE THIS IS DEBUG
+        //delay(25); //TODO REMOVE THIS IS DEBUG
     }
     
     drive(-ROBOT_LENGTH * abs(angle)/145.0);
