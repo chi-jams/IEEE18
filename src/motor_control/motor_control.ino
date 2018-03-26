@@ -13,13 +13,14 @@ const float ROBOT_LENGTH = 10.75;
 //control info
 const float K_P = 1/80.0;
 const int ZERO_ERROR_MARGIN = 240;
+const float ERROR_THRESHHOLD = 0.25;
 int  MIN_MOTOR_SPEED = 110;
 int  MAX_MOTOR_SPEED = 150;
 
 //positional info
 enum POS_INFO{X, Y, R, NUM_AXIS};
-volatile int current_pos[NUM_AXIS];
-volatile int target_pos[NUM_AXIS];
+volatile float current_pos[NUM_AXIS];
+volatile float target_pos[NUM_AXIS];
 
 //encoder info
 volatile long enc_counts[4];
@@ -42,8 +43,7 @@ enum COMMANDS {GET_TARG_POS, GET_CUR_POS};
 bool completed_movement = true;
 const int I2C_ADDR = 0x42;
 
-
-
+bool posUpdated = false;
 
 void setup() {
 
@@ -73,6 +73,41 @@ void setup() {
 }
 
 void loop() {
+    if(posUpdated){
+        posUpdated = false;
+        bool forwards = false;
+        float chosenVec[3];
+        float startR = current_pos[R];
+        float endR = target_pos[R];
+        if (abs(current_pos[X] - target_pos[X]) > ERROR_THRESHHOLD || abs(current_pos[X] - target_pos[X]) > ERROR_THRESHHOLD){
+            float vec1[3] = {target_pos[X]-current_pos[X], target_pos[Y]-current_pos[Y], 
+                              acos((target_pos[X]-current_pos[X])/sqrt(pow(target_pos[X]-current_pos[X],2) 
+                              +pow(target_pos[Y]-current_pos[Y],2)))};
+            float vec2[3] = {current_pos[X]-target_pos[X], current_pos[Y]-target_pos[Y], 
+                              acos((current_pos[X]-target_pos[X])/sqrt(pow(current_pos[X]-target_pos[X],2) 
+                              +pow(current_pos[Y]-target_pos[Y],2)))};
+            float angle1 = dot_product(vec1,current_pos,2);
+            float angle2 = dot_product(vec2,current_pos,2);
+            if (angle1 < angle2){
+                forwards = false;
+                chosenVec[X] = vec1[X];
+                chosenVec[Y] = vec1[Y];
+                chosenVec[R] = vec1[R];
+            } else {
+                forwards = true;
+                chosenVec[X] = vec2[X];
+                chosenVec[Y] = vec2[Y];
+                chosenVec[R] = vec2[R];
+            }
+            turn(getTurnAngle(current_pos[R],chosenVec[R]));
+            float distance = sqrt(pow(chosenVec[X],2) + pow(chosenVec[Y],2));
+            if (!forwards) distance *= -1;
+            drive(distance);
+            startR = chosenVec[R];
+        }
+        float angle = getTurnAngle(startR, endR);
+        turn(angle);
+    }
 
   
 }
@@ -323,6 +358,11 @@ void getPosition(int num_bytes) {
         // We have an unexpected message, throw it out.
         dumpData();   
     }
+    posUpdated = true;
+}
+
+void checkDone(){
+    Wire.write(completed_movement);
 }
 
 
@@ -335,4 +375,28 @@ void dumpData() {
     while (Wire.available()) Wire.read();
 }
 
+float dot_product(volatile float *a, volatile float *b,int size)
+{
+    float dp = 0.0f;
+    for (int i=0;i<size;i++)
+        dp += a[i] * b[i];
+    return dp;
+}
+
+float getTurnAngle(float s, float e){
+    float alpha = e - s;
+    float minAngle = abs(alpha);
+    float angle = alpha;
+    float beta = e - s + 360;
+    if (abs(beta) < minAngle){
+        minAngle = abs(beta);
+        angle = beta;
+    }
+    float gamma = e - s - 360;
+    if (abs(gamma) < minAngle){
+        minAngle = abs(gamma);
+        angle = gamma;
+    }
+    return gamma;
+}
 
