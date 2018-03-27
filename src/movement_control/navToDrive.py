@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import smbus
 import struct
+from gyro import Gyro
+import time as t
 
 class NavToDrive:
     BUS_NUM = 1
@@ -32,12 +34,12 @@ class NavToDrive:
 
     def sendRotation(self, rot):
         rot = int(round(rot))
-        msg = NavToDrive.serializeMsg(list(rot))
+        msg = NavToDrive.serializeMsg([rot])
         self.bus.write_block_data(self.addr, NavToDrive.SEND_GYRO_ROT, msg)
 
     def checkDone(self):
         msg = self.bus.read_byte(self.addr) 
-        return msg == 0
+        return (msg == 1 or msg == 129)
         
     def validatePos(pos):
         if type(pos) not in [tuple, list] or len(pos) != 3:
@@ -50,6 +52,7 @@ class NavToDrive:
 # Use this to debug this connection
 if __name__ == "__main__":
     to_drive = NavToDrive(0x42)
+    g = Gyro(0x68)
     try:
         while True:
             try:
@@ -64,10 +67,17 @@ if __name__ == "__main__":
                     to_drive.sendCurPos(pos)
                 else:
                     raise ValueError("Invalid number of args") 
+
+                while not to_drive.checkDone():
+                    try:
+                        t.sleep(0.05)
+                        rot = g.get_z_rotation()
+                        print(rot)
+                        to_drive.sendRotation(rot)
+                    except IOError as e:
+                        print (e)
                 
-                g = Gyro(0x68)
-                while True:
-                    sendRotation(g.get_z_rotation())
+                print("DONE WITH MOVE!")
 
             except ValueError as e:
                 print(e)
