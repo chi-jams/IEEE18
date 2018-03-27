@@ -13,13 +13,14 @@ const float ROBOT_LENGTH = 10.75;
 
 //control info
 const float K_P = 1/80.0;
+const float K_P_ANGLE = 1/3600.0;
 const int ZERO_ERROR_MARGIN = 240;
 const float ERROR_THRESHOLD_POS = 0.25;
-const float ERROR_THRESHOLD_ROT = 3.0;
-int  MIN_MOTOR_SPEED = 90;
-int  MAX_MOTOR_SPEED = 120;
-int  TURN_SPEED      = 150;
-int  CONFORM_SPEED   =  30;
+const float ERROR_THRESHOLD_ROT = 1.0;
+int  MIN_MOTOR_SPEED = 80;
+int  MAX_MOTOR_SPEED = 100;
+int  TURN_SPEED      = 120;
+int  CONFORM_SPEED   =  -50;
 
 //positional info
 enum POS_INFO{X, Y, R, NUM_AXIS};
@@ -46,10 +47,9 @@ enum TYPE {A, B};
 
 //communication info
 enum COMMANDS {GET_TARG_POS, GET_CUR_POS, GET_GYRO_ROT};
-bool completed_movement = true;
+byte completed_movement = 0;
 
-
-bool posUpdated = false;
+int posUpdated = false;
 
 void setup() {
 
@@ -89,6 +89,11 @@ void loop() {
     if(posUpdated){
         posUpdated = false;
         turn(target_pos[R] - current_pos[R]);
+        completed_movement = 1;
+        current_pos[X] = target_pos[X];
+        current_pos[Y] = target_pos[Y];
+        current_pos[R] = target_pos[R];
+        
         //gotoTarget();
     }
   
@@ -165,27 +170,36 @@ void drive(float distance){
     for (int i = 0; i < 4; i++){
         goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV); 
     }
+
+    bool corrected = false;
+    while (!corrected){
   
-    long errors[4][MOVING_AVG_SIZE];
-    int replaceIndex = 0;
-    bool filled = false;
-    do { 
-      
-        for (int i = 0; i < 4; i++){
-            errors[i][replaceIndex] = enc_counts[i] - goals[i];
-            if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
-            if (!filled) continue;
-            
-            int motorVal = -errorToMotorOut(K_P, errors[i][replaceIndex]);
-            //Serial.print(average(errors[i]));
-            //Serial.print("  ");
-            
-            setMotor(i, motorVal);
-        }
-        //Serial.println();
-        replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
-    } while (!isZero(errors));
-    //Serial.println("DONE");
+        long errors[4][MOVING_AVG_SIZE];
+        int replaceIndex = 0;
+        bool filled = false;
+        
+        do { 
+          
+            for (int i = 0; i < 4; i++){
+                errors[i][replaceIndex] = enc_counts[i] - goals[i];
+                if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+                if (!filled) continue;
+                
+                int motorVal = errorToMotorOut(K_P, errors[i][replaceIndex]);
+                Serial.print(average(errors[i]));
+                Serial.print("  ");
+                
+                setMotor(i, motorVal);
+            }
+            Serial.println();
+            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
+        } while (!isZero(errors));
+        stopMotors();
+        //Serial.println("DONE");
+        delay(250);
+        corrected = isZero(errors);
+        corrected = true;
+    }
     stopMotors();
 }
 
@@ -195,22 +209,42 @@ void drive(float distance){
  */
 void turn(float angle){
     
-    drive(-ROBOT_LENGTH * abs(angle)/180.0);
+    drive(-ROBOT_LENGTH * abs(angle)/210.0);
+    delay(500);
 
     long start_rot  = gyro_rot;
     long target_rot = start_rot + angle;
     
-    while (abs(gyro_rot - target_rot) > ERROR_THRESHOLD_ROT){
-        float error = gyro_rot - target_rot;
-        setMotor(FL, error > 0 ? TURN_SPEED   :0);
-        setMotor(BL, error > 0 ? TURN_SPEED   :0);
-        setMotor(FR, error > 0 ? 0:TURN_SPEED); 
-        setMotor(BR, error > 0 ? 0:TURN_SPEED); 
-        //gyro_rot += angle > 0 ? 1:-1; //TODO REMOVE THIS IS DEBUG
-        //delay(25); //TODO REMOVE THIS IS DEBUG
+    bool corrected = false;
+    while (!corrected){
+        bool filled = false;
+        int replaceIndex = 0;
+        long errors[MOVING_AVG_SIZE];
+        do {
+            errors[replaceIndex] = gyro_rot - target_rot;
+            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
+            if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+            if (!filled) continue;
+            
+            int motorVal = errorToMotorOut(K_P_ANGLE, errors[replaceIndex]);
+            long avg = average(errors);
+            
+            Serial.print("Motor val: ");
+            Serial.println(motorVal);
+            
+            setMotor(FL, avg > 0 ? TURN_SPEED   :   CONFORM_SPEED);
+            setMotor(BL, avg > 0 ? TURN_SPEED   :   CONFORM_SPEED);
+            setMotor(FR, avg > 0 ? CONFORM_SPEED: TURN_SPEED); 
+            setMotor(BR, avg > 0 ? CONFORM_SPEED: TURN_SPEED); 
+            
+        } while (abs(gyro_rot - target_rot) > ERROR_THRESHOLD_ROT);
+        stopMotors();
+        delay(250);  
+        corrected = abs(gyro_rot - target_rot) <= ERROR_THRESHOLD_ROT;
     }
     
-    drive(-ROBOT_LENGTH * abs(angle)/145.0);
+    delay(500);
+    drive(-ROBOT_LENGTH * abs(angle)/135.0);
     stopMotors();
   
 }
@@ -221,7 +255,7 @@ void turn(float angle){
  */
 int errorToMotorOut(float gain, long error){
     //no error
-    if (abs(error) <= ZERO_ERROR_MARGIN) return 0;
+    //if (abs(error) <= ZERO_ERROR_MARGIN) return 0;
 
     //motor level with base power + error * gain
     int motorOut = gain * -error + (error <= 0 ? MIN_MOTOR_SPEED : -MIN_MOTOR_SPEED);
@@ -240,7 +274,7 @@ int errorToMotorOut(float gain, long error){
  */
 void setMotor(int m, int pwm){
     //set direction
-    digitalWrite(DIR_PINS[m], pwm > 0 ? LOW:HIGH);
+    digitalWrite(DIR_PINS[m], pwm > 0 ? HIGH:LOW);
 
     //set speed
     if (pwm < 0)   pwm = -pwm;
@@ -343,13 +377,17 @@ void getPosition(int num_bytes) {
     
     // Do a sanity check to make sure that the data received follows the correct format
     if (num_bytes == bytes + 2) {
-        posUpdated = true;
+        
         if (cmd == GET_TARG_POS) {
+          posUpdated = true;  
+          completed_movement = 0;
             for(int i = 0; i < 3; i++)
                 target_pos[i] = i2cGetInt();
             dir = i2cGetInt();
         }
         else if (cmd == GET_CUR_POS) {
+          posUpdated = true;
+          completed_movement = 0;
             for (int i = 0; i < 3; i++)
                 current_pos[i] = i2cGetInt();
         }
