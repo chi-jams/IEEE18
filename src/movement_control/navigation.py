@@ -2,6 +2,7 @@
 from featureDetect import *
 from gyro import Gyro
 from navToDrive import NavToDrive
+import time as t
 
 DIST_THRESH  = 0.25
 ANGLE_THRESH = 3.0
@@ -138,18 +139,15 @@ def executeInstuctions(instructList):
         #drive
         else:
             target_pos = [instruct[i] for i in range(1:4)]
-            #if going backwards
-            if name == "DRB":
-                d = -1
-            else:
-                d = 1
-
             #send target to navduino and wait for completion
             navPi.sendRotation(g.get_z_rotation())
-            navPi.sendTargetPosition(target_pos, d)
+            navPi.sendTargetPosition(target_pos)
             while not navPi.checkDone():
+                t.sleep(0.05)
+                rot = g.get_z_rotation()
+                print(rot)
                 navPi.sendRotation(g.get_z_rotation())
-
+            '''
             #if instruction includes camera check
             if len(instruct) > 4:
                 check = instruct[4]
@@ -170,7 +168,7 @@ def executeInstuctions(instructList):
                         navPi.sendRotation(g.get_z_rotation())
                 else:
                     raise ValueError("Unknown check instruction")
-            
+            '''
             print ("FINISHED: " + " ".join(instruct))
 
 if __name__ == "__main__":

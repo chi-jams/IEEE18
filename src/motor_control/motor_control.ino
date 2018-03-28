@@ -8,16 +8,16 @@ const int I2C_ADDR = 0x42;
 const unsigned long COUNTS_PER_REV = 3200;
 const unsigned int  MOVING_AVG_SIZE = 25;
 
-const float DISTANCE_PER_REV = 3.14159265 * 3.295; //pi * wheel diameter
+const float DISTANCE_PER_REV = 3.14159265 * 3.56; //pi * wheel diameter
 const float ROBOT_LENGTH = 10.75;
 
 //control info
 const float K_P = 1/80.0;
 const float K_P_ANGLE = 1/3600.0;
-const int ZERO_ERROR_MARGIN = 240;
+const int ZERO_ERROR_MARGIN = 120;
 const float ERROR_THRESHOLD_POS = 0.25;
 const float ERROR_THRESHOLD_ROT = 1.0;
-int  MIN_MOTOR_SPEED = 80;
+int  MIN_MOTOR_SPEED = 70;
 int  MAX_MOTOR_SPEED = 100;
 int  TURN_SPEED      = 120;
 int  CONFORM_SPEED   =  -50;
@@ -29,7 +29,7 @@ volatile float target_pos[NUM_AXIS];
 
 //encoder info
 volatile long enc_counts[4];
-volatile long gyro_rot = 0;
+volatile float gyro_rot = 0;
 volatile int dir;
 unsigned int ENC_PINS[4][2] = { {A8, A9 },
                                 {10, 11},
@@ -37,7 +37,7 @@ unsigned int ENC_PINS[4][2] = { {A8, A9 },
                                 {12, 13} };
 
 
-//motor pins
+//motor pinss
 unsigned int PWM_PINS[4] = {2, 3, 4, 5};
 unsigned int DIR_PINS[4] = {23, 22, 25, 24};
 
@@ -76,8 +76,8 @@ void setup() {
     PCintPort::attachInterrupt(ENC_PINS[BR][A], BRA_changed,  CHANGE);
     PCintPort::attachInterrupt(ENC_PINS[BR][B], BRB_changed,  CHANGE);
 
-    current_pos[X] = 0.0;
-    current_pos[Y] = 0.0;
+    current_pos[X] = 48.0;
+    current_pos[Y] = 6.0;
     current_pos[R] = 90.0;
 
 }
@@ -87,75 +87,63 @@ void loop() {
     
     //change in position was detected
     if(posUpdated){
-        posUpdated = false;
-        turn(target_pos[R] - current_pos[R]);
-        completed_movement = 1;
-        current_pos[X] = target_pos[X];
-        current_pos[Y] = target_pos[Y];
-        current_pos[R] = target_pos[R];
-        
-        //gotoTarget();
+        posUpdated = false;      
+        gotoTarget();
     }
   
 }
 
 void gotoTarget(){
-    bool forwards = false;
-    float chosenVec[3];
-    float startR = current_pos[R];
-    float endR = target_pos[R];
+    float curToTarg1[3];
+    curToTarg1[X] = target_pos[X]-current_pos[X];
+    curToTarg1[Y] = target_pos[Y]-current_pos[Y];
+    curToTarg1[R] = degrees(atan2(curToTarg1[Y], curToTarg1[X]));
 
-    //if we are above the error threshold in the x or y
-    if (abs(current_pos[X] - target_pos[X]) > ERROR_THRESHOLD_POS || 
-        abs(current_pos[Y] - target_pos[Y]) > ERROR_THRESHOLD_POS ||
-        abs(current_pos[R]- target_pos[R]) > ERROR_THRESHOLD_ROT) {
-        //start to end
-        float vec1[3] = {target_pos[X]-current_pos[X], target_pos[Y]-current_pos[Y], 
-                          acos((target_pos[X]-current_pos[X])/sqrt(pow(target_pos[X]-current_pos[X],2) 
-                          +pow(target_pos[Y]-current_pos[Y],2)))};
-        //end to start
-        float vec2[3] = {current_pos[X]-target_pos[X], current_pos[Y]-target_pos[Y], 
-                          acos((current_pos[X]-target_pos[X])/sqrt(pow(current_pos[X]-target_pos[X],2) 
-                          +pow(current_pos[Y]-target_pos[Y],2)))};
-        //angles between
-        float angle1 = dot_product(vec1,current_pos,2);
-        float angle2 = dot_product(vec2,current_pos,2);
-        //choose smaller angle
-        if (abs(angle1) < abs(angle2)){
-            forwards = false;
-            chosenVec[X] = vec1[X];
-            chosenVec[Y] = vec1[Y];
-            chosenVec[R] = vec1[R];
-        } else {
-            forwards = true;
-            chosenVec[X] = vec2[X];
-            chosenVec[Y] = vec2[Y];
-            chosenVec[R] = vec2[R];
-        }
-        //turn towards goal position
-        if (abs(current_pos[R]- chosenVec[R]) > ERROR_THRESHOLD_ROT){
-            turn(getTurnAngle(current_pos[R],chosenVec[R]));
-            startR = chosenVec[R];
-        }
+    float curToTarg2[3];
+    curToTarg2[X] = current_pos[X]-target_pos[X];
+    curToTarg2[Y] = current_pos[Y]-target_pos[Y];
+    curToTarg2[R] = degrees(atan2(curToTarg2[Y], curToTarg2[X]));
+    
+    //turn to target pos
+    float turnAngleToTarget1 = getTurnAngle(current_pos[R], curToTarg1[R]);
+    float turnAngleToTarget2 = getTurnAngle(current_pos[R], curToTarg2[R]);
 
-        //get straightline distance to target
-        float distance = sqrt(pow(chosenVec[X],2) + pow(chosenVec[Y],2));
-        if (!forwards) distance *= -1;
-        
-        //drive to target
-        if (distance > ERROR_THRESHOLD_POS)
-            drive(distance);
-       
+    float distToTarget = sqrt(pow(curToTarg1[X],2) + pow(curToTarg1[Y], 2));
+
+    Serial.println(abs(turnAngleToTarget1));
+    Serial.println(abs(turnAngleToTarget2));
+    float turnAngleToAlign;
+    if (abs(turnAngleToTarget1) <= abs(turnAngleToTarget2)){
+      if (distToTarget != 0){
+          turn(turnAngleToTarget1);
+          drive(distToTarget);
+          turnAngleToAlign = getTurnAngle(curToTarg1[R], target_pos[R]);
+      }
+      else {
+          turnAngleToAlign = getTurnAngle(current_pos[R] , target_pos[R]);  
+      }
+      turn(turnAngleToAlign);
+      
     }
-    //turn to target rotation
-    if (abs(startR - endR) > ERROR_THRESHOLD_ROT){
-        float angle = getTurnAngle(startR, endR);
-        turn(angle);
+    else {
+      if (distToTarget != 0){
+          turn(turnAngleToTarget2);
+          drive(-distToTarget);
+          turnAngleToAlign = getTurnAngle(curToTarg2[R], target_pos[R]);
+      }
+      else {
+          turnAngleToAlign = getTurnAngle(current_pos[R] , target_pos[R]);  
+      }
+      turn(turnAngleToAlign);
+      
     }
+
+
+    completed_movement = 1;
     current_pos[X] = target_pos[X];
     current_pos[Y] = target_pos[Y];
     current_pos[R] = target_pos[R];
-
+    
 }
 
 /*
@@ -164,16 +152,27 @@ void gotoTarget(){
  */
 void drive(float distance){
 
+    Serial.print("DRIVE: ");
+    Serial.println(distance);
+
     resetEncoderCounts();
+    delay(250);
     
     long goals[4];
     for (int i = 0; i < 4; i++){
         goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV); 
     }
 
+
+    Serial.print("GOALS: ");
+    for (int i = 0; i < 4; i++){
+        Serial.print(goals[i]); 
+        Serial.print(" "); 
+    }
+    Serial.println();
+    
     bool corrected = false;
     while (!corrected){
-  
         long errors[4][MOVING_AVG_SIZE];
         int replaceIndex = 0;
         bool filled = false;
@@ -186,19 +185,19 @@ void drive(float distance){
                 if (!filled) continue;
                 
                 int motorVal = errorToMotorOut(K_P, errors[i][replaceIndex]);
-                Serial.print(average(errors[i]));
-                Serial.print("  ");
+               // Serial.print(average(errors[i]));
+                //Serial.print("  ");
                 
                 setMotor(i, motorVal);
             }
-            Serial.println();
+           // Serial.println();
             replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
         } while (!isZero(errors));
         stopMotors();
-        //Serial.println("DONE");
-        delay(250);
+        Serial.println("DONE");
+        delay(500);
         corrected = isZero(errors);
-        corrected = true;
+        
     }
     stopMotors();
 }
@@ -229,13 +228,10 @@ void turn(float angle){
             int motorVal = errorToMotorOut(K_P_ANGLE, errors[replaceIndex]);
             long avg = average(errors);
             
-            Serial.print("Motor val: ");
-            Serial.println(motorVal);
-            
-            setMotor(FL, avg > 0 ? TURN_SPEED   :   CONFORM_SPEED);
-            setMotor(BL, avg > 0 ? TURN_SPEED   :   CONFORM_SPEED);
-            setMotor(FR, avg > 0 ? CONFORM_SPEED: TURN_SPEED); 
-            setMotor(BR, avg > 0 ? CONFORM_SPEED: TURN_SPEED); 
+            setMotor(FL, avg > 0 ? TURN_SPEED     : CONFORM_SPEED);
+            setMotor(BL, avg > 0 ? TURN_SPEED + 30: CONFORM_SPEED);
+            setMotor(FR, avg > 0 ? CONFORM_SPEED  : TURN_SPEED     ); 
+            setMotor(BR, avg > 0 ? CONFORM_SPEED  : TURN_SPEED + 30); 
             
         } while (abs(gyro_rot - target_rot) > ERROR_THRESHOLD_ROT);
         stopMotors();
@@ -382,17 +378,16 @@ void getPosition(int num_bytes) {
           posUpdated = true;  
           completed_movement = 0;
             for(int i = 0; i < 3; i++)
-                target_pos[i] = i2cGetInt();
-            dir = i2cGetInt();
+                target_pos[i] = i2cGetInt() / 100.0;
         }
         else if (cmd == GET_CUR_POS) {
           posUpdated = true;
           completed_movement = 0;
             for (int i = 0; i < 3; i++)
-                current_pos[i] = i2cGetInt();
+                current_pos[i] = i2cGetInt() / 100.0;
         }
         else if (cmd == GET_GYRO_ROT){
-            gyro_rot = i2cGetInt();  
+            gyro_rot = i2cGetInt() / 100.0;
         }
         else {
             dumpData();

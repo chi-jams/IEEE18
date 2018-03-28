@@ -15,25 +15,22 @@ class NavToDrive:
         self.addr = addr
         self.bus = smbus.SMBus(NavToDrive.BUS_NUM)
 
-    def sendTargPos(self, pos, direction):
+    def sendTargPos(self, pos):
         NavToDrive.validatePos(pos)
+        pos = [int(pos[i] * 100) for i in range(3)]
 
-        if type(direction) != int:
-            raise TypeError("direction must be an integer")
-        elif direction not in [0,1]:
-            raise ValueError("Direction must be a 1 or 0")
-
-        msg = NavToDrive.serializeMsg(list(pos) + [direction])
+        msg = NavToDrive.serializeMsg(list(pos))
         self.bus.write_block_data(self.addr, NavToDrive.SEND_TARG_POS, msg)
 
     def sendCurPos(self, pos):
         NavToDrive.validatePos(pos)
+        pos = [int(pos[i] * 100) for i in range(3)]
 
         msg = NavToDrive.serializeMsg(list(pos))
         self.bus.write_block_data(self.addr, NavToDrive.SEND_CUR_POS, msg)
 
     def sendRotation(self, rot):
-        rot = int(round(rot))
+        rot = int(round(rot*100))
         msg = NavToDrive.serializeMsg([rot])
         self.bus.write_block_data(self.addr, NavToDrive.SEND_GYRO_ROT, msg)
 
