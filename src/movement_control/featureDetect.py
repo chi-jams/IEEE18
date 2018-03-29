@@ -73,7 +73,7 @@ class FeatureDetector:
             # Distance from the line to the screen
             proj = projection(mid_pts[0], mid_pts[1], self.SCREEN_CENTER, toInt=True)
             err = length(proj, self.SCREEN_CENTER)
-            err = [0, err] if getHorizontal else [err, 0]
+            err = [0, err] 
 
             if getHorizontal:
                 angle_ref = max(mid_pts, key=lambda p: p[0])
@@ -91,11 +91,11 @@ class FeatureDetector:
                 if cv2.waitKey(1) & 0xff == ord('q'):
                     cv2.destroyAllWindows()
             if getHorizontal:
-                err[1] *= 1 if self.SCREEN_CENTER[1] - proj[1] < 0 else -1
+                err[0] *= 1 if self.SCREEN_CENTER[1] - proj[1] > 0 else -1
             else:
-                err[0] *= -1 if self.SCREEN_CENTER[0] - proj[0] < 0 else 1
+                err[0] *= 1 if self.SCREEN_CENTER[0] - proj[0] > 0 else -1
 
-            frame_err = (err*, r_err)
+            frame_err = (*err, r_err)
             print(frame_err)
             errs = [errs[i] + frame_err[i] for i in range(3)]
             succ_reads += 1
@@ -189,17 +189,24 @@ class FeatureDetector:
         print (errors)
         return errors
 
+    #TODO get midpoint of defect hull line
     def forkDetect(self, orientation):
         
+        diffLine = False
         #target angle in reference to line left of the diagonal
-        if orientation == 'Up':
+        if orientation == 'up':
             targetAngle = 135
-        elif orientation == 'Down':
+        elif orientation == 'down':
             targetAngle = -45
-        elif orientation == 'Down-Right':
+        elif orientation == 'down-right':
             targetAngle = 0
-        elif orientation == 'Up-Right':
+        elif orientation == 'up-right':
             targetAngle = 90
+        elif orientation == 'up-left':
+            targetAngle = 90
+            diffLine = True
+        elif orientation == 'down-left':
+            targetAngle == -90
         else:
             raise ValueError("Not a valid orientation of fork")
 
@@ -213,87 +220,99 @@ class FeatureDetector:
             center_find = cv2.erode(self.thresh, circ_kernel, iterations=1)
             _, center_cnts, _ = cv2.findContours(center_find, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             #get the maximum image contour
-            max_center_cnt = center_cnts[np.argmax(np.array([cv2.contourArea(cnt) for cnt in center_cnts]), axis=0)]
-            #get moments
-            M = cv2.moments(max_center_cnt)
-            #get center
-            cx, cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
-            center = (cx, cy)
-            if self.debug:
-                cv2.circle(self.orig_img, center, 5, [0,0,255], -1)
-          
-
-            if self.defects is not None:
-                #get the 4 largest defects
-                top_defects = self.defects[self.defects[:,0][:,3].argsort()[-4:]]
-                pts = []
-                for i in range(top_defects.shape[0]):
-                    #get start, end, defect pt, dist
-                    s,e,f,d = top_defects[i,0]
-                    start = tuple(self.max_contour[s][0])
-                    end = tuple(self.max_contour[e][0])
-                    #append relevant hull points 
-                    far = tuple(self.max_contour[f][0])
-                    btwn = angle_between(start, far, end)
-                    pts.append((far, btwn))
+            if center_cnts:
+                max_center_cnt = center_cnts[np.argmax(
+                                             np.array([cv2.contourArea(cnt) 
+                                             for cnt in center_cnts]), axis=0)]
+                #get moments
+                M = cv2.moments(max_center_cnt)
+                #get center
+                if M['m00'] != 0:
+                    cx, cy = int(M['m10']/M['m00']), int(M['m01']/M['m00'])
+                    center = (cx, cy)
                     if self.debug:
-                        cv2.line(self.orig_img, start, end, [0,255,0],2)
-                
-                #sort by angle between hull line and defect
-                pts.sort(key=lambda x: x[1])
-                #get two smallest values
-                pts = pts[:2]
-                if self.debug:
-                    for p in pts:
-                        cv2.circle(self.orig_img, p[0], 5, [255,0,0], -1)
-                
-                #get midpoint of two defects
-                defect_mid = midpoint(tuple(pts[0][0]), tuple(pts[1][0]), 
-                                      toInt=True)
-                diag1 = ((defect_mid[0]-cx)*1000  + cx, (defect_mid[1]-cy)*1000  + cy)
-                diag2 = ((defect_mid[0]-cx)*-1000 + cx, (defect_mid[1]-cy)*-1000 + cy)
-                
-                diag  = (diag1, diag2)
-                left  = rotate_around(center, diag1, -45, toInt = True)
-                left2 = rotate_around(center, diag1, 135, toInt = True)
-                right = rotate_around(center, diag1, 45, toInt = True)
-                right2= rotate_around(center, diag1, -135, toInt = True)
+                        cv2.circle(self.orig_img, center, 5, [0,0,255], -1)
+                  
 
-                x_proj = projection(left, left2, self.SCREEN_CENTER, toInt=True)
-                x_error = length(x_proj, self.SCREEN_CENTER)
-                x_ref_point = (center[0] + self.SCREEN_CENTER[0] - x_proj[0],
-                               center[1] + self.SCREEN_CENTER[1] - x_proj[1])
-                if angle_between(x_ref_point, center, left) > 90:
-                    x_error *= -1
+                    if self.defects is not None:
+                        #get the 4 largest defects
+                        top_defects = self.defects[self.defects[:,0][:,3].argsort()[-4:]]
+                        pts = []
+                        for i in range(top_defects.shape[0]):
+                            #get start, end, defect pt, dist
+                            s,e,f,d = top_defects[i,0]
+                            start = tuple(self.max_contour[s][0])
+                            end = tuple(self.max_contour[e][0])
+                            #append relevant hull points 
+                            far = tuple(self.max_contour[f][0])
+                            btwn = angle_between(start, far, end)
+                            pts.append((far, btwn))
+                            if self.debug:
+                                cv2.line(self.orig_img, start, end, [0,255,0],2)
+                        
+                        #sort by angle between hull line and defect
+                        pts.sort(key=lambda x: x[1])
+                        #get two smallest values
+                        pts = pts[:2]
+                        if self.debug:
+                            for p in pts:
+                                cv2.circle(self.orig_img, p[0], 5, [255,0,0], -1)
+                        
+                        if len(pts) > 1:
+                            #get midpoint of two defects
+                            defect_mid = midpoint(tuple(pts[0][0]), tuple(pts[1][0]), 
+                                                  toInt=True)
+                            diag1 = ((defect_mid[0]-cx)*1000  + cx, (defect_mid[1]-cy)*1000  + cy)
+                            diag2 = ((defect_mid[0]-cx)*-1000 + cx, (defect_mid[1]-cy)*-1000 + cy)
+                            
+                            diag  = (diag1, diag2)
+                            left  = rotate_around(center, diag1, -45, toInt = True)
+                            left2 = rotate_around(center, diag1, 135, toInt = True)
+                            right = rotate_around(center, diag1, 45, toInt = True)
+                            right2= rotate_around(center, diag1, -135, toInt = True)
 
-                y_proj = projection(right, right2, self.SCREEN_CENTER, toInt=True)
-                y_error = length(y_proj, self.SCREEN_CENTER)
-                y_ref_point = (center[0] + self.SCREEN_CENTER[0] - y_proj[0],
-                               center[1] + self.SCREEN_CENTER[1] - y_proj[1])
-                if angle_between(y_ref_point, center, right) > 90:
-                    y_error *= -1
+                            x_proj = projection(left, left2, self.SCREEN_CENTER, toInt=True)
+                            x_error = length(x_proj, self.SCREEN_CENTER)
+                            x_ref_point = (center[0] + self.SCREEN_CENTER[0] - x_proj[0],
+                                           center[1] + self.SCREEN_CENTER[1] - x_proj[1])
+                            if angle_between(x_ref_point, center, right) > math.pi/2.0:
+                                x_error *= -1
 
-                #r difference
-                r_error = (atan2(left[1] - center[1],
-                                 left[0] - center[0]) 
-                                 * self.RAD_TO_DEG)
-                r_error += targetAngle 
+                            y_proj = projection(right, right2, self.SCREEN_CENTER, toInt=True)
+                            y_error = length(y_proj, self.SCREEN_CENTER)
+                            y_ref_point = (center[0] + self.SCREEN_CENTER[0] - y_proj[0],
+                                           center[1] + self.SCREEN_CENTER[1] - y_proj[1])
+                            if angle_between(y_ref_point, center, left) > math.pi/2.0:
+                                y_error *= -1
 
-                if self.debug:
-                    cv2.line(self.orig_img, defect_mid, center, [255,0,0], 2)
-                    cv2.line(self.orig_img, left, center, [255,0,0], 2)
-                    cv2.line(self.orig_img, right, center,[255,0,0], 2)
-                    cv2.line(self.orig_img, tuple(x_proj), 
-                             tuple(self.SCREEN_CENTER), [0,255,0], 2)
-                    cv2.line(self.orig_img, tuple(y_proj), 
-                             tuple(self.SCREEN_CENTER), [0,255,0], 2)
-                    cv2.imshow("Fork Detect", self.orig_img)
-                    if cv2.waitKey(1) & 0xff == ord('q'):
-                        cv2.destroyAllWindows()
-                
-                frame_error = (x_error, y_error, r_error)
-                errors = [errors[i] + frame_error[i] for i in range(3)]
-                succ_reads += 1
+                            #r difference
+                            if not diffLine:
+                                r_error = (atan2(left[1] - center[1],
+                                                 left[0] - center[0]) 
+                                                 * self.RAD_TO_DEG)
+                            else:
+                                r_error = (atan2(right[1] - center[1],
+                                                 right[0] - center[0]) 
+                                                 * self.RAD_TO_DEG)
+                            
+                            r_error += targetAngle 
+
+                            if self.debug:
+                                cv2.line(self.orig_img, defect_mid, center, [255,0,0], 2)
+                                cv2.line(self.orig_img, left, center, [255,0,0], 2)
+                                cv2.line(self.orig_img, right, center,[255,0,0], 2)
+                                cv2.line(self.orig_img, tuple(x_proj), 
+                                         tuple(self.SCREEN_CENTER), [0,255,0], 2)
+                                cv2.line(self.orig_img, tuple(y_proj), 
+                                         tuple(self.SCREEN_CENTER), [0,255,0], 2)
+                                cv2.imshow("Fork Detect", self.orig_img)
+                                if cv2.waitKey(1) & 0xff == ord('q'):
+                                    cv2.destroyAllWindows()
+                            
+                            frame_error = (x_error, y_error, r_error)
+                            print(frame_error)
+                            errors = [errors[i] + frame_error[i] for i in range(3)]
+                            succ_reads += 1
 
         errors = [errors[i] / succ_reads for i in range(3)]
         print (errors)
@@ -361,5 +380,3 @@ class FeatureDetector:
         errors = [errors[i] / succ_reads for i in range(3)]
         print (errors)
         return errors
-
-    

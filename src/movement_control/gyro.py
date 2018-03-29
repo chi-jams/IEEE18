@@ -1,9 +1,12 @@
-
+#!/bin/python
 import smbus
 import math
 import time
 
 class Gyro:
+
+    MIN_INC = 3.0
+
     def __init__(self, addr):
         self.bus = smbus.SMBus(1)
         self.addr = addr
@@ -41,20 +44,21 @@ class Gyro:
         return -math.degrees(radians)
 
     def get_z_rotation(self):
-        self.z_rot += self.read_word_2c(0x47) + self.offset
-        return math.degrees(self.z_rot / (633515.0))
+        time.sleep(0.05)
+        new_z = self.read_word_2c(0x47) + self.offset 
+        self.z_rot += self.read_word_2c(0x47) + self.offset 
+        return math.degrees(self.z_rot / (16384*4.32))
 
     def calibrate(self):
         z_error = 0
-        for i in range(500):
-                time.sleep(0.01)
+        for i in range(100):
+                time.sleep(0.05)
                 z_error += self.read_word_2c(0x47)
-        self.offset = -(z_error / 500.0)
+        self.offset = -(z_error / 100.0)
 
 def main():
     g = Gyro(0x68)
     while True:
-        time.sleep(0.01)
         print(g.get_z_rotation())
 
 if __name__ == '__main__':

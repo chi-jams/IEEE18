@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import smbus
 import struct
+from gyro import Gyro
+import time as t
 
 class NavToDrive:
     BUS_NUM = 1
@@ -13,30 +15,28 @@ class NavToDrive:
         self.addr = addr
         self.bus = smbus.SMBus(NavToDrive.BUS_NUM)
 
-    def sendTargPos(self, pos, direction):
+    def sendTargPos(self, pos):
         NavToDrive.validatePos(pos)
+        pos = [int(pos[i] * 100) for i in range(3)]
 
-        if type(direction) != int:
-            raise TypeError("direction must be an integer")
-        elif direction not in [0,1]:
-            raise ValueError("Direction must be a 1 or 0")
-
-        msg = NavToDrive.serializeMsg(list(pos) + [direction])
+        msg = NavToDrive.serializeMsg(list(pos))
         self.bus.write_block_data(self.addr, NavToDrive.SEND_TARG_POS, msg)
 
     def sendCurPos(self, pos):
         NavToDrive.validatePos(pos)
+        pos = [int(pos[i] * 100) for i in range(3)]
 
         msg = NavToDrive.serializeMsg(list(pos))
         self.bus.write_block_data(self.addr, NavToDrive.SEND_CUR_POS, msg)
 
     def sendRotation(self, rot):
-        msg = NavToDrive.serializeMsg(list(rot))
+        rot = int(round(rot*100))
+        msg = NavToDrive.serializeMsg([rot])
         self.bus.write_block_data(self.addr, NavToDrive.SEND_GYRO_ROT, msg)
 
     def checkDone(self):
         msg = self.bus.read_byte(self.addr) 
-        return msg == 0
+        return (msg == 1 or msg == 129)
         
     def validatePos(pos):
         if type(pos) not in [tuple, list] or len(pos) != 3:
@@ -49,6 +49,7 @@ class NavToDrive:
 # Use this to debug this connection
 if __name__ == "__main__":
     to_drive = NavToDrive(0x42)
+    g = Gyro(0x68)
     try:
         while True:
             try:
@@ -63,6 +64,17 @@ if __name__ == "__main__":
                     to_drive.sendCurPos(pos)
                 else:
                     raise ValueError("Invalid number of args") 
+
+                while not to_drive.checkDone():
+                    try:
+                        t.sleep(0.05)
+                        rot = g.get_z_rotation()
+                        print(rot)
+                        to_drive.sendRotation(rot)
+                    except IOError as e:
+                        print (e)
+                
+                print("DONE WITH MOVE!")
 
             except ValueError as e:
                 print(e)
