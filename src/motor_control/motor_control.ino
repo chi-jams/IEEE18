@@ -13,12 +13,11 @@ const float ROBOT_LENGTH = 10.75;
 
 //control info
 const float K_P = 1/80.0;
-const float K_P_ANGLE = 1/3600.0;
 const int ZERO_ERROR_MARGIN = 240;
 const float ERROR_THRESHOLD_POS = 0.25;
 const float ERROR_THRESHOLD_ROT = 1.0;
-int  MIN_MOTOR_SPEED = 90;
-int  MAX_MOTOR_SPEED = 180;
+int  MIN_MOTOR_SPEED = 80;
+int  MAX_MOTOR_SPEED = 80;
 int  TURN_SPEED      = 120;
 int  CONFORM_SPEED   =  -50;
 
@@ -151,54 +150,32 @@ void gotoTarget(){
  */
 void drive(float distance){
 
-    Serial.print("DRIVE: ");
-    Serial.println(distance);
-
     resetEncoderCounts();
-    delay(250);
     
     long goals[4];
     for (int i = 0; i < 4; i++){
         goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV); 
     }
 
-
-    Serial.print("GOALS: ");
-    for (int i = 0; i < 4; i++){
-        Serial.print(goals[i]); 
-        Serial.print(" "); 
-    }
-    Serial.println();
+    long errors[4][MOVING_AVG_SIZE];
+    int replaceIndex = 0;
+    bool filled = false;
     
-    bool corrected = false;
-    while (!corrected){
-        long errors[4][MOVING_AVG_SIZE];
-        int replaceIndex = 0;
-        bool filled = false;
+    do { 
+        for (int i = 0; i < 4; i++){
+            errors[i][replaceIndex] = enc_counts[i] - goals[i];
+            if (!filled) continue;
+   
+            int motorVal = errorToMotorOut(K_P, errors[i][replaceIndex]);
+           
+            setMotor(i, motorVal);
+        }
+
+        if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+        replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;   
         
-        do { 
-          
-            for (int i = 0; i < 4; i++){
-                errors[i][replaceIndex] = enc_counts[i] - goals[i];
-                if (!filled) continue;
+    } while (!filled || !isZero(errors));
        
-                int motorVal = errorToMotorOut(K_P, errors[i][replaceIndex]);
-               // Serial.print(average(errors[i]));
-                //Serial.print("  ");
-                
-                setMotor(i, motorVal);
-            }
-           // Serial.println();
-            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;   
-            if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
-            
-        } while (!filled || !isZero(errors));
-        stopMotors();
-        Serial.println("DONE");
-        delay(500);
-        corrected = isZero(errors);
-        
-    }
     stopMotors();
 }
 
@@ -211,6 +188,8 @@ void turn(float angle){
     drive(-ROBOT_LENGTH * abs(angle)/210.0);
     delay(500);
 
+    bool reverse = false;
+
     long start_rot  = gyro_rot;
     long target_rot = start_rot + angle;
     
@@ -221,22 +200,30 @@ void turn(float angle){
         long errors[MOVING_AVG_SIZE];
         do {
             errors[replaceIndex] = gyro_rot - target_rot;
-            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
             if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
             if (!filled) continue;
             
-            int motorVal = errorToMotorOut(K_P_ANGLE, errors[replaceIndex]);
             long avg = average(errors);
-            
-            setMotor(FL, avg > 0 ? TURN_SPEED     : CONFORM_SPEED);
-            setMotor(BL, avg > 0 ? TURN_SPEED + 30: CONFORM_SPEED);
-            setMotor(FR, avg > 0 ? CONFORM_SPEED  : TURN_SPEED     ); 
-            setMotor(BR, avg > 0 ? CONFORM_SPEED  : TURN_SPEED + 30); 
+
+            if (!reverse){
+                setMotor(FL, avg > 0 ? TURN_SPEED     : CONFORM_SPEED  );
+                setMotor(BL, avg > 0 ? TURN_SPEED + 30: CONFORM_SPEED  );
+                setMotor(FR, avg > 0 ? CONFORM_SPEED  : TURN_SPEED     ); 
+                setMotor(BR, avg > 0 ? CONFORM_SPEED  : TURN_SPEED + 30); 
+            }
+            else{
+                setMotor(FL, avg < 0 ? -TURN_SPEED - 30  : -CONFORM_SPEED );
+                setMotor(BL, avg < 0 ? -TURN_SPEED: -CONFORM_SPEED  );
+                setMotor(FR, avg < 0 ? -CONFORM_SPEED  : -TURN_SPEED -30 ); 
+                setMotor(BR, avg < 0 ? -CONFORM_SPEED  : -TURN_SPEED ); 
+            }
             
         } while (abs(gyro_rot - target_rot) > ERROR_THRESHOLD_ROT);
         stopMotors();
         delay(250);  
         corrected = abs(gyro_rot - target_rot) <= ERROR_THRESHOLD_ROT;
+        if (!corrected){reverse = !reverse;}
     }
     
     delay(500);
@@ -278,9 +265,15 @@ void setMotor(int m, int pwm){
 }
 
 void stopMotors(){
-  for(int i = 0; i < 4; i++){
-      setMotor(i, 0);  
-  } 
+    for(int i = 0; i < 4; i++){
+        setMotor(i, -50);  
+    } 
+  
+    delay(250);
+    
+    for(int i = 0; i < 4; i++){
+        setMotor(i, 0);  
+    } 
 }
 
 /*
@@ -299,11 +292,11 @@ bool isZero(long errors[][MOVING_AVG_SIZE]){
 }
 
 long average(long* errors){
-    float sum = 0;
+    double sum = 0;
     for (int i = 0; i < MOVING_AVG_SIZE; i++){
         sum += errors[i];
     }
-    return (long)(sum /MOVING_AVG_SIZE);
+    return (long)(sum / MOVING_AVG_SIZE);
   
 }
 
