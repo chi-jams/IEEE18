@@ -8,7 +8,7 @@ const int I2C_ADDR = 0x42;
 const unsigned long COUNTS_PER_REV = 3200;
 const unsigned int  MOVING_AVG_SIZE = 25;
 
-const float DISTANCE_PER_REV = 3.14159265 * 3.56; //pi * wheel diameter
+const float DISTANCE_PER_REV = 3.14159265 * 4.1; //pi * wheel diameter
 const float ROBOT_LENGTH = 10.75;
 
 //control info
@@ -266,7 +266,7 @@ void setMotor(int m, int pwm){
 
 void stopMotors(){
     for(int i = 0; i < 4; i++){
-        setMotor(i, -50);  
+        setMotor(i, -30);  
     } 
   
     delay(250);
