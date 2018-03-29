@@ -8,8 +8,10 @@ const int addr = 0x43;
 AccelStepper stepper(AccelStepper::DRIVER, 8, 9); //step, dir
 
 enum COLOR{RED, GREEN, BLUE, GRAY, CYAN, MAGENTA, YELLOW};
-int pos[7] = {0,450,900,1350,1800,2250,2700};
-enum CMD{GET_COLOR};
+int pos[7] = {0,460,920,1380,1840,2300,2760};
+int storeOffset = -1610;
+bool isDropping = false;
+enum CMD{GET_COLOR, SET_DROP};
 
 void setup()
 { 
@@ -18,11 +20,9 @@ void setup()
   Wire.onReceive(getColor);
   Wire.onRequest(nothing);
   
-  pinMode(10, OUTPUT);
-  digitalWrite(10, LOW);
-  
   stepper.setMaxSpeed(50000);
-  stepper.setAcceleration(3000000);
+  stepper.setAcceleration(30000);
+  stepper.moveTo(pos[0] + storeOffset);
 }
 
 void loop()
@@ -30,10 +30,21 @@ void loop()
 
   if (Serial.available() > 0){
     int goTo = Serial.read() - 48;
-    stepper.moveTo(pos[goTo]);
+    Serial.println(goTo);
+    if (goTo == 9) isDropping = !isDropping;
+    else stepper.moveTo(pos[goTo] + (isDropping ? 0:storeOffset));
   }
-  
   stepper.run();
+
+  /*for (int i = 0; i < 7; i++){
+      if (stepper.distanceToGo() == 0){
+          stepper.moveTo(pos[i]);
+      }  
+      else {i--;}
+      stepper.run();
+  }
+  */
+  
  }
 
 void getColor(int num_bytes) {
@@ -46,7 +57,10 @@ void getColor(int num_bytes) {
     if (num_bytes == bytes + 2) {
         if (cmd == GET_COLOR) {
           int color = i2cGetInt();
-          stepper.moveTo(color);
+          stepper.moveTo(pos[color] + isDropping?0:storeOffset);
+        }
+        else if (cmd == SET_DROP){
+          isDropping = i2cGetInt() == 1;
         }
         else {
             dumpData();
@@ -68,5 +82,4 @@ int i2cGetInt() {
 void dumpData() {
     while (Wire.available()) Wire.read();
 }
-
 

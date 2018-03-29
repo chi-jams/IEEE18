@@ -14,11 +14,11 @@ const float ROBOT_LENGTH = 10.75;
 //control info
 const float K_P = 1/80.0;
 const float K_P_ANGLE = 1/3600.0;
-const int ZERO_ERROR_MARGIN = 120;
+const int ZERO_ERROR_MARGIN = 240;
 const float ERROR_THRESHOLD_POS = 0.25;
 const float ERROR_THRESHOLD_ROT = 1.0;
-int  MIN_MOTOR_SPEED = 70;
-int  MAX_MOTOR_SPEED = 100;
+int  MIN_MOTOR_SPEED = 90;
+int  MAX_MOTOR_SPEED = 180;
 int  TURN_SPEED      = 120;
 int  CONFORM_SPEED   =  -50;
 
@@ -37,7 +37,7 @@ unsigned int ENC_PINS[4][2] = { {A8, A9 },
                                 {12, 13} };
 
 
-//motor pinss
+//motor pins
 unsigned int PWM_PINS[4] = {2, 3, 4, 5};
 unsigned int DIR_PINS[4] = {23, 22, 25, 24};
 
@@ -84,7 +84,6 @@ void setup() {
 
 void loop() {
 
-    
     //change in position was detected
     if(posUpdated){
         posUpdated = false;      
@@ -181,9 +180,8 @@ void drive(float distance){
           
             for (int i = 0; i < 4; i++){
                 errors[i][replaceIndex] = enc_counts[i] - goals[i];
-                if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
                 if (!filled) continue;
-                
+       
                 int motorVal = errorToMotorOut(K_P, errors[i][replaceIndex]);
                // Serial.print(average(errors[i]));
                 //Serial.print("  ");
@@ -191,8 +189,10 @@ void drive(float distance){
                 setMotor(i, motorVal);
             }
            // Serial.println();
-            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
-        } while (!isZero(errors));
+            replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;   
+            if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
+            
+        } while (!filled || !isZero(errors));
         stopMotors();
         Serial.println("DONE");
         delay(500);
