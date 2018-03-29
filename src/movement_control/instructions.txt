@@ -18,19 +18,19 @@ DR 36.25 59.75 315 toFork up
 DR 59.75 36.25 315 toFork down
 DR 77.75 18.25 315 toFork down
 Rotate 77.75 18.25 135 toFork up
-DRB 84.25 11.75 135
+DR 84.25 11.75 135
 Dump red
 DR 77.75 18.25 135 toFork up
 Rotate 77.75 18.25 90 toFork up-left
 DR 77.75 48 90 toCross
 Rotate 77.75 48 180 toCross
-DRB 84.25 48 180
+DR 84.25 48 180
 Dump green
 DR 77.75 48 180 toCross
 Rotate 77.75 48 90 toCross
 DR 77.75 77.75 90 toFork down-left
 Rotate 77.75 77.75 225 toFork up
-DRB 84.25 84.25 225
+DR 84.25 84.25 225
 Dump blue
 DR 77.75 77.75 225 toFork up
 DR 59.75 59.75 225 toFork up
@@ -39,19 +39,19 @@ Dump gray
 DR 36.25 36.25 225 toFork down
 DR 18.25 18.25 225 toFork down
 Rotate 18.25 18.25 45 toFork up
-DRB 11.75 11.75 45
+DR 11.75 11.75 45
 Dump cyan
 DR 18.25 18.25 45 toFork up
 Rotate 18.25 18.25 90 toFork up-right
 DR 18.25 48 90 toCross
 Rotate 18.25 48 0 toCross
-DRB 11.75 48 0
+DR 11.75 48 0
 Dump magenta
 DR 18.25 48 0 toCross
 Rotate 18.25 48 90 toCross
 DR 18.25 77.75 90 toFork down-right
 Rotate 18.25 77.75 315 toFork up
-DRB 11.75 84.25 315
+DR 11.75 84.25 315
 Dump yellow
 DR 18.25 77.75 315 toFork up
 Rotate 18.25 77.75 0 toFork up-right
