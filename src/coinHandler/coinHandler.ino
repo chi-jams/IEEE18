@@ -11,7 +11,22 @@ enum COLOR{RED, GREEN, BLUE, GRAY, CYAN, MAGENTA, YELLOW};
 int pos[7] = {0,460,920,1380,1840,2300,2760};
 int storeOffset = -1610;
 bool isDropping = false;
-enum CMD{GET_COLOR, SET_DROP};
+enum CMD{GET_COLOR, DUMP, KILL_ALL};
+
+int dump_pin = 2;
+int force_stop = 6;
+int conveyor_start = 7;
+
+//conveyor
+int enA = 3;
+int in1 = 4;
+int in2 = 5;
+
+//solenoid
+int enB = 10;
+int in3 = 11;
+int in4 = 12;
+
 
 void setup()
 { 
@@ -23,6 +38,27 @@ void setup()
   stepper.setMaxSpeed(50000);
   stepper.setAcceleration(30000);
   stepper.moveTo(pos[0] + storeOffset);
+
+  // set all the motor control pins to outputs
+    pinMode(dump_pin, INPUT_PULLUP);
+    pinMode(conveyor_start, INPUT_PULLUP);
+    pinMode(force_stop, INPUT_PULLUP);
+    pinMode(enA, OUTPUT);
+    pinMode(enB, OUTPUT);
+    pinMode(in1, OUTPUT);
+    pinMode(in2, OUTPUT);
+    pinMode(in3, OUTPUT);
+    pinMode(in4, OUTPUT);
+  
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    analogWrite (enA, 0);
+  
+    digitalWrite(in3, LOW);
+    digitalWrite(in4, LOW);
+    analogWrite (enB, 0);
+
+    setConveyor(false);
 }
 
 void loop()
@@ -36,16 +72,62 @@ void loop()
   }
   stepper.run();
 
-  /*for (int i = 0; i < 7; i++){
-      if (stepper.distanceToGo() == 0){
-          stepper.moveTo(pos[i]);
-      }  
-      else {i--;}
-      stepper.run();
-  }
-  */
-  
+   if (digitalRead(dump_pin) == LOW){
+        delay(50);
+        if (digitalRead(dump_pin) == LOW){
+            isDropping = true;
+            stepper.moveTo(RED + (isDropping?0:storeOffset) );
+            openHatch();
+        }
+    }
+
+    if (digitalRead(force_stop) == LOW){
+        delay(50);
+        if (digitalRead(force_stop) == LOW){
+            kill_all();
+        }
+    }
+    
+    if (digitalRead(conveyor_start) == LOW){
+        delay(50);
+        if (digitalRead(conveyor_start) == LOW){
+            
+            setConveyor(true);
+        }
+    }
+
  }
+
+void setConveyor(bool on){
+    if (on){
+        digitalWrite(in1, HIGH);
+        digitalWrite(in2, LOW);
+        analogWrite (enA, 150);          
+    } 
+    else {
+        digitalWrite(in1, LOW);
+        digitalWrite(in2, LOW);
+        analogWrite (enA, 0);
+    } 
+}
+
+void openHatch(){
+    digitalWrite(in3, HIGH);
+    digitalWrite(in4, LOW);
+    analogWrite (enB, 255);
+    delay(500);
+    digitalWrite(in3, LOW);
+    digitalWrite(in4, LOW);
+    analogWrite (enB, 0);
+  
+}
+
+void kill_all(){
+    isDropping = false;
+    stepper.moveTo(RED + (isDropping?0:storeOffset) );
+    setConveyor(false);
+  
+}
 
 void getColor(int num_bytes) {
     // The smbus implementation sends over a command and the number of bytes it has in its payload
@@ -58,9 +140,6 @@ void getColor(int num_bytes) {
         if (cmd == GET_COLOR) {
           int color = i2cGetInt();
           stepper.moveTo(pos[color] + isDropping?0:storeOffset);
-        }
-        else if (cmd == SET_DROP){
-          isDropping = i2cGetInt() == 1;
         }
         else {
             dumpData();
