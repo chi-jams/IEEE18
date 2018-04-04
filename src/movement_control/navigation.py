@@ -3,13 +3,20 @@ from featureDetect import *
 from gyro import Gyro
 from navToDrive import NavToDrive
 import time as t
+import RPi.GPIO as GPIO
+import sys
 
 DIST_THRESH  = 0.25
 ANGLE_THRESH = 3.0
 PIXEL_TO_INCH = 1/160.0
+ON_BUTTON_PIN = 16
+OFF_BUTTON_PIN = 18
+DUMP_PIN = 8
+INITIATE_PIN = 38
+FORCE_STOP_PIN = 40
 
 def readInstructionFile():
-    file = open("instructions.txt", "r")
+    file = open("simpleInstructions.txt", "r")
     instructList = []
     for line in file:
         instructList.append(line.split())
@@ -125,7 +132,7 @@ def withinThreshold(errors):
            abs(errors[1]) <  DIST_THRESH and\
            abs(errors[2]) < ANGLE_THRESH
 
-def executeInstuctions(instructList):
+def executeInstructions(instructList):
     for instruct in instructList:
         
         #get instruction type
@@ -134,19 +141,20 @@ def executeInstuctions(instructList):
         #dump
         if name == "Dump":
             color = instruct[1]
-            #TODO add dump instructions
-        
+            dump() 
         #drive
         else:
-            target_pos = [instruct[i] for i in range(1:4)]
+            target_pos = [float(instruct[i]) for i in range(1,4)]
+
             #send target to navduino and wait for completion
             navPi.sendRotation(g.get_z_rotation())
-            navPi.sendTargetPosition(target_pos)
+            navPi.sendTargPos(target_pos)
             while not navPi.checkDone():
                 t.sleep(0.05)
-                rot = g.get_z_rotation()
-                print(rot)
+                if GPIO.input(OFF_BUTTON_PIN) == GPIO.LOW:
+                    force_stop()
                 navPi.sendRotation(g.get_z_rotation())
+            
             '''
             #if instruction includes camera check
             if len(instruct) > 4:
@@ -168,12 +176,50 @@ def executeInstuctions(instructList):
                         navPi.sendRotation(g.get_z_rotation())
                 else:
                     raise ValueError("Unknown check instruction")
-            '''
+            '''            
             print ("FINISHED: " + " ".join(instruct))
+    force_stop()
+
+def setupGPIO():
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(ON_BUTTON_PIN,  GPIO.IN, GPIO.PUD_UP)
+    GPIO.setup(OFF_BUTTON_PIN, GPIO.IN, GPIO.PUD_UP)
+    GPIO.setup(DUMP_PIN, GPIO.OUT)
+    GPIO.setup(FORCE_STOP_PIN, GPIO.OUT)
+    GPIO.setup(INITIATE_PIN,  GPIO.OUT)
+    GPIO.output(DUMP_PIN, True)
+    GPIO.output(FORCE_STOP_PIN, True)
+    GPIO.output(INITIATE_PIN, True)
+
+def startup_conveyor():
+    GPIO.output(INITIATE_PIN, False)
+    t.sleep(.1)
+    GPIO.output(INITIATE_PIN, True)
+
+def force_stop():
+    print("STOPPED")
+    navPi.sendForceStop()
+    GPIO.output(FORCE_STOP_PIN, False)
+    t.sleep(.1)
+    GPIO.output(FORCE_STOP_PIN, True)
+    t.sleep(.1)
+    sys.exit(0) 
+    
+def dump():
+    GPIO.output(DUMP_PIN, False)
+    t.sleep(.1)
+    GPIO.output(DUMP_PIN, True)
+
 
 if __name__ == "__main__":
-    fd = FeatureDetector(30,debug=True) #get camera features
-    g  = Gyro(0x68)                     #get rotation feedback
+    #fd = FeatureDetector(30,debug=True) #get camera features
+    setupGPIO()
     navPi = NavToDrive(0x42)            #send instructions to navduino
+    g  = Gyro(0x68)                     #get rotation feedback
+    print("Setup Gyroscope")
+    while GPIO.input(ON_BUTTON_PIN) == GPIO.HIGH:
+        t.sleep(0.05)
+    print("STARTED")
+    startup_conveyor()
     inst = readInstructionFile()        #read instructions.txt
     executeInstructions(inst)           #do instructions
