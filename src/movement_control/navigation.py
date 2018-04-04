@@ -12,6 +12,7 @@ PIXEL_TO_INCH = 1/160.0
 ON_BUTTON_PIN = 16
 OFF_BUTTON_PIN = 18
 DUMP_PIN = 8
+GO_LIGHT_PIN = 37
 INITIATE_PIN = 38
 FORCE_STOP_PIN = 40
 
@@ -187,9 +188,11 @@ def setupGPIO():
     GPIO.setup(DUMP_PIN, GPIO.OUT)
     GPIO.setup(FORCE_STOP_PIN, GPIO.OUT)
     GPIO.setup(INITIATE_PIN,  GPIO.OUT)
+    GPIO.setup(GO_LIGHT_PIN,  GPIO.OUT)
     GPIO.output(DUMP_PIN, True)
     GPIO.output(FORCE_STOP_PIN, True)
     GPIO.output(INITIATE_PIN, True)
+    GPIO.output(GO_LIGHT_PIN, False)
 
 def startup_conveyor():
     GPIO.output(INITIATE_PIN, False)
@@ -217,6 +220,7 @@ if __name__ == "__main__":
     navPi = NavToDrive(0x42)            #send instructions to navduino
     g  = Gyro(0x68)                     #get rotation feedback
     print("Setup Gyroscope")
+    GPIO.output(GO_LIGHT_PIN, True)
     while GPIO.input(ON_BUTTON_PIN) == GPIO.HIGH:
         t.sleep(0.05)
     print("STARTED")

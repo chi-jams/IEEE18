@@ -8,17 +8,17 @@ const int I2C_ADDR = 0x42;
 const unsigned long COUNTS_PER_REV = 3200;
 const unsigned int  MOVING_AVG_SIZE = 25;
 
-const float DISTANCE_PER_REV = 3.14159265 * 4.1; //pi * wheel diameter
+const float DISTANCE_PER_REV = 3.14159265 * 4.05; //pi * wheel diameter
 const float ROBOT_LENGTH = 10.75;
 
 //control info
 const float K_P = 1/80.0;
-const int ZERO_ERROR_MARGIN = 240;
+const int ZERO_ERROR_MARGIN = 280;
 const float ERROR_THRESHOLD_POS = 0.25;
-const float ERROR_THRESHOLD_ROT = 1.0;
+const float ERROR_THRESHOLD_ROT = 1.5;
 int  MIN_MOTOR_SPEED = 80;
 int  MAX_MOTOR_SPEED = 80;
-int  TURN_SPEED      = 120;
+int  TURN_SPEED      = 130;
 int  CONFORM_SPEED   = -50;
 
 //positional info
@@ -159,6 +159,8 @@ void drive(float distance){
 
     resetEncoderCounts();
     
+    long start_rot  = gyro_rot;
+    
     long goals[4];
     for (int i = 0; i < 4; i++){
         goals[i] = (long) (distance * COUNTS_PER_REV / DISTANCE_PER_REV); 
@@ -175,7 +177,7 @@ void drive(float distance){
             if (!filled) continue;
    
             int motorVal = errorToMotorOut(K_P, errors[i][replaceIndex]);
-           
+            
             setMotor(i, motorVal);
         }
 
@@ -192,6 +194,17 @@ void drive(float distance){
  * Takes in an angle in degrees and turns CW/CCW until value is reached
  */
 void turn(float angle){
+
+    float startBack, endBack;
+    if (abs(angle) == 45){
+        startBack = -ROBOT_LENGTH * abs(angle)/135.0;
+        endBack   = -ROBOT_LENGTH * abs(angle)/210.0;
+    }
+    else if (abs(angle) == 90){
+        startBack = -ROBOT_LENGTH * abs(angle)/210.0;
+        endBack   = -ROBOT_LENGTH * abs(angle)/135.0; 
+    }
+  
     
     drive(-ROBOT_LENGTH * abs(angle)/210.0);
     delay(500);
