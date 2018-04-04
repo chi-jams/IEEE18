@@ -19,7 +19,7 @@ const float ERROR_THRESHOLD_ROT = 1.0;
 int  MIN_MOTOR_SPEED = 80;
 int  MAX_MOTOR_SPEED = 80;
 int  TURN_SPEED      = 120;
-int  CONFORM_SPEED   =  -50;
+int  CONFORM_SPEED   = -50;
 
 //positional info
 enum POS_INFO{X, Y, R, NUM_AXIS};
@@ -45,10 +45,11 @@ enum ENC {FL, FR, BL, BR};
 enum TYPE {A, B};
 
 //communication info
-enum COMMANDS {GET_TARG_POS, GET_CUR_POS, GET_GYRO_ROT};
+enum COMMANDS {GET_TARG_POS, GET_CUR_POS, GET_GYRO_ROT, FORCE_STOP};
 byte completed_movement = 0;
 
 int posUpdated = false;
+int force_stop = false;
 
 void setup() {
 
@@ -87,6 +88,12 @@ void loop() {
     if(posUpdated){
         posUpdated = false;      
         gotoTarget();
+    }
+
+    if (force_stop){
+        force_stop = false;
+        stopMotors();
+        while(true){}
     }
   
 }
@@ -132,7 +139,7 @@ void gotoTarget(){
       else {
           turnAngleToAlign = getTurnAngle(current_pos[R] , target_pos[R]);  
       }
-      turn(turnAngleToAlign);
+      turn(turnAngleToAlign); 
       
     }
 
@@ -162,6 +169,7 @@ void drive(float distance){
     bool filled = false;
     
     do { 
+        if (force_stop) loop();
         for (int i = 0; i < 4; i++){
             errors[i][replaceIndex] = enc_counts[i] - goals[i];
             if (!filled) continue;
@@ -194,11 +202,13 @@ void turn(float angle){
     long target_rot = start_rot + angle;
     
     bool corrected = false;
-    while (!corrected){
+    while ( !corrected){
         bool filled = false;
         int replaceIndex = 0;
         long errors[MOVING_AVG_SIZE];
         do {
+            if (force_stop) loop();
+          
             errors[replaceIndex] = gyro_rot - target_rot;
             if (replaceIndex == MOVING_AVG_SIZE-1) filled = true;
             replaceIndex = (replaceIndex + 1) % MOVING_AVG_SIZE;
@@ -265,11 +275,6 @@ void setMotor(int m, int pwm){
 }
 
 void stopMotors(){
-    for(int i = 0; i < 4; i++){
-        setMotor(i, -30);  
-    } 
-  
-    delay(250);
     
     for(int i = 0; i < 4; i++){
         setMotor(i, 0);  
@@ -381,6 +386,10 @@ void getPosition(int num_bytes) {
         }
         else if (cmd == GET_GYRO_ROT){
             gyro_rot = i2cGetInt() / 100.0;
+        }
+        else if (cmd == FORCE_STOP){
+            i2cGetInt();
+            force_stop = true;  
         }
         else {
             dumpData();
