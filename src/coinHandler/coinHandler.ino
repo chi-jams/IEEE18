@@ -37,7 +37,6 @@ void setup()
   
   stepper.setMaxSpeed(50000);
   stepper.setAcceleration(30000);
-  stepper.moveTo(pos[0] + storeOffset);
 
   // set all the motor control pins to outputs
     pinMode(dump_pin, INPUT_PULLUP);
@@ -90,8 +89,8 @@ void loop()
     
     if (digitalRead(conveyor_start) == LOW){
         delay(50);
-        if (digitalRead(conveyor_start) == LOW){
-            
+        if (digitalRead(conveyor_start) == LOW){    
+            stepper.moveTo(pos[0] + storeOffset);
             setConveyor(true);
         }
     }
@@ -102,7 +101,7 @@ void setConveyor(bool on){
     if (on){
         digitalWrite(in1, HIGH);
         digitalWrite(in2, LOW);
-        analogWrite (enA, 150);          
+        analogWrite (enA, 200);          
     } 
     else {
         digitalWrite(in1, LOW);
